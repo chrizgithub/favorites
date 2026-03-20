@@ -14,43 +14,77 @@
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg-color); color: #fff; font-family: -apple-system, sans-serif; padding: 30px 10px; display: flex; flex-direction: column; align-items: center; }
-        h1 { font-size: 1.5rem; font-weight: 800; width: 100%; max-width: 340px; margin-bottom: 25px; padding-left: 5px; }
-        .back-bar { width: 100%; max-width: 340px; margin-bottom: 20px; display: none; }
-        #bookmarkGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px 10px; width: 100%; max-width: 340px; }
-        .item { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: inherit; width: 100%; }
         
-        /* 아이콘 박스 */
+        h1 { font-size: 1.5rem; font-weight: 800; width: 100%; max-width: 340px; margin-bottom: 25px; padding-left: 5px; }
+        
+        /* 뒤로가기 바 */
+        .back-bar { width: 100%; max-width: 340px; margin-bottom: 20px; display: none; }
+        .back-btn { background:none; border:none; color:#fff; cursor:pointer; display:flex; align-items:center; gap:4px; font-weight:600; }
+
+        /* 그리드 시스템 (4열 유지) */
+        #bookmarkGrid { 
+            display: grid; 
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 15px 8px; 
+            width: 100%; 
+            max-width: 340px; 
+        }
+
+        .item { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            text-decoration: none; 
+            color: inherit; 
+            width: 100%; 
+            min-width: 0; /* 그리드 내부 텍스트 생략을 위해 필수 */
+        }
+        
+        /* 아이콘 박스 (10% 축소 사이즈) */
         .icon-box {
-            width: 100%; max-width: 58px; aspect-ratio: 1 / 1;
-            background-color: var(--tile-bg); border-radius: 16px;
+            width: 100%; 
+            max-width: 58px; 
+            aspect-ratio: 1 / 1;
+            background-color: var(--tile-bg); 
+            border-radius: 16px;
             display: flex; justify-content: center; align-items: center;
             overflow: hidden; border: 1px solid #2a2a2a; position: relative;
         }
 
-        /* 1. 선명도 및 필터 */
         .favicon-img {
             width: 100%; height: 100%; object-fit: cover;
             image-rendering: -webkit-optimize-contrast;
-            opacity: 0; /* 로딩 전엔 아예 투명하게 */
-            transition: opacity 0.2s;
+            opacity: 0; transition: opacity 0.2s;
+            position: absolute; top: 0; left: 0; z-index: 2;
         }
         
-        /* 2. GitHub 하얀색 강제 반전 */
         .github-invert { filter: invert(1) brightness(2) !important; }
 
-        /* 3. 알파벳 플레이스홀더 (이미지 실패 시 노출) */
+        /* 알파벳 플레이스홀더 */
         .char-placeholder {
-            position: absolute; font-size: 24px; font-weight: 800; color: #ffffff;
+            font-size: 24px; font-weight: 800; color: #555;
             text-transform: uppercase; z-index: 1;
         }
 
+        /* 텍스트 길면 생략 (...) */
+        .label { 
+            font-size: 10px; 
+            color: var(--text-dim); 
+            text-align: center; 
+            width: 100%; 
+            margin-top: 7px; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            padding: 0 2px;
+        }
+
         .folder-icon { color: #fff; width: 26px; height: 26px; }
-        .label { font-size: 10px; color: var(--text-dim); text-align: center; width: 100%; margin-top: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     </style>
 </head>
 <body>
     <h1>CH Favorites</h1>
-    <div class="back-bar" id="backBar"><button onclick="goBack()" style="background:none; border:none; color:#fff; cursor:pointer;">[뒤로]</button></div>
+    <div class="back-bar" id="backBar"><button class="back-btn" onclick="goBack()"><i data-lucide="chevron-left" size="18"></i> 뒤로</button></div>
     <div id="bookmarkGrid"></div>
 
     <script>
@@ -94,8 +128,7 @@
                 } else {
                     const domain = new URL(item.url).hostname;
                     const char = domain.replace('www.', '').charAt(0).toUpperCase();
-                    // 4대 고해상도 시도 (순서: 내장ICON -> DuckDuckGo -> Google -> 픽셀아이콘)
-                    const apiIdx = Math.floor(Math.random() * 2); // API 분산
+                    // 1순위: 내장 아이콘, 2순위: 덕덕고 고해상도
                     const iconUrl = item.icon || `https://icons.duckduckgo.com/ip3/${domain}.ico`;
 
                     div.innerHTML = `
@@ -114,18 +147,16 @@
         }
 
         function showImg(img) {
-            // 이미지가 너무 작거나(지구본) 로드 실패하면 그냥 알파벳 보여줌
-            if (img.naturalWidth < 17) return; 
-            img.style.opacity = "1";
-            img.previousElementSibling.style.display = "none"; 
+            // 저화질 지구본(16px)이면 무시하고 알파벳 노출
+            if (img.naturalWidth > 16) { 
+                img.style.opacity = "1";
+            }
         }
 
         function switchApi(img, domain) {
             if (!img.dataset.retry) {
                 img.dataset.retry = "1";
                 img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-            } else {
-                img.style.display = 'none'; // 다 실패하면 알파벳만
             }
         }
 
