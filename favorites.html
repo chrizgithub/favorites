@@ -23,7 +23,6 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            overflow-x: hidden; /* 가로 스크롤 방지 */
         }
 
         h1 {
@@ -32,19 +31,42 @@
             font-weight: 800;
             width: 100%;
             max-width: 380px;
-            margin-bottom: 25px;
+            text-align: left;
             padding-left: 10px;
         }
 
-        /* 그리드 영역: 화면 너비를 넘지 않도록 강제 */
+        /* 뒤로 가기 버튼 바 */
+        .back-bar {
+            width: 100%;
+            max-width: 380px;
+            text-align: left;
+            padding: 10px 10px 20px 10px;
+            display: none; /* 기본 숨김 */
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--title-color);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
         #bookmarkGrid {
             display: grid;
             grid-template-columns: repeat(4, 1fr); 
             gap: 15px 10px;
             width: 100%;
             max-width: 380px;
-            table-layout: fixed; /* 레이아웃 고정 효과 */
+            margin-top: 20px;
         }
+
+        /* 최상위일 때 margin 조정 */
+        h1 + #bookmarkGrid { margin-top: 30px; }
 
         .item {
             display: flex;
@@ -53,12 +75,12 @@
             text-decoration: none;
             color: inherit;
             width: 100%;
-            min-width: 0; /* 중요: 자식 요소의 텍스트 생략을 위해 필요 */
+            min-width: 0;
             cursor: pointer;
         }
 
         .icon-box {
-            width: 100%; /* 부모 너비에 맞춤 */
+            width: 100%;
             max-width: 65px;
             aspect-ratio: 1 / 1;
             background-color: var(--tile-bg);
@@ -78,18 +100,18 @@
         }
         
         .folder-icon { color: #FFD700; width: 30px; height: 30px; }
+        .backup-icon { color: #444; width: 24px; height: 24px; }
 
-        /* 텍스트 강제 줄임 설정 */
         .label {
             font-size: 10px;
             color: var(--text-dim);
             text-align: center;
-            width: 100%; /* 부모 너비 100% 사용 */
+            width: 100%;
             margin-top: 8px;
-            display: block; /* 블록 요소화 */
-            white-space: nowrap; /* 한 줄로 고정 */
-            overflow: hidden; /* 넘치는 부분 숨김 */
-            text-overflow: ellipsis; /* 끝에 ... 표시 */
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .loading-status { color: #444; margin-top: 50px; font-size: 12px; }
@@ -98,11 +120,19 @@
 <body>
 
     <h1>CH Favorites</h1>
+    
+    <div class="back-bar" id="backBar">
+        <button class="back-btn" id="backBtn">
+            <i data-lucide="chevron-left" size="18"></i> 뒤로
+        </button>
+    </div>
+
     <div id="bookmarkGrid"></div>
     <div id="status" class="loading-status"></div>
 
     <script>
-        let bookmarkData = [];
+        let bookmarkData = []; // 최상위 데이터
+        let currentFolderStack = []; // 뒤로 가기 추적용 스택
 
         async function init() {
             const status = document.getElementById('status');
@@ -120,11 +150,21 @@
                 const mainDL = parentDT.querySelector('dl');
 
                 bookmarkData = parseDL(mainDL);
-                renderGrid(bookmarkData);
+                renderGrid(bookmarkData); // 최상위 목록 그리기
                 status.style.display = 'none';
             } catch (err) {
                 status.textContent = "파일을 찾을 수 없습니다.";
             }
+
+            // 뒤로 가기 버튼 이벤트 등록
+            document.getElementById('backBtn').onclick = function() {
+                if (currentFolderStack.length > 0) {
+                    currentFolderStack.pop(); // 현재 폴더를 스택에서 제거
+                    // 부모 폴더 목록으로 다시 그리기 (스택이 비면 최상위 데이터 사용)
+                    const prevData = currentFolderStack.length > 0 ? currentFolderStack[currentFolderStack.length - 1].children : bookmarkData;
+                    renderGrid(prevData); 
+                }
+            };
         }
 
         function parseDL(dl) {
@@ -139,7 +179,8 @@
                 if (h3 && nextDL) {
                     data.push({ type: 'folder', name: h3.textContent.trim(), children: parseDL(nextDL) });
                 } else if (a) {
-                    data.push({ type: 'link', name: a.textContent.trim(), url: a.href });
+                    // 북마크 파일 내부에 ICON 속성이 있다면 저장
+                    data.push({ type: 'link', name: a.textContent.trim(), url: a.href, icon: a.getAttribute('ICON') });
                 }
             });
             return data;
@@ -147,7 +188,17 @@
 
         function renderGrid(dataList) {
             const grid = document.getElementById('bookmarkGrid');
+            const backBar = document.getElementById('backBar');
             grid.innerHTML = '';
+
+            // 뒤로 가기 바 표시 여부 결정
+            if (currentFolderStack.length > 0) {
+                backBar.style.display = 'block';
+                grid.style.marginTop = '0'; // 뒤로 가기 바가 있을 때 여백 축소
+            } else {
+                backBar.style.display = 'none';
+                grid.style.marginTop = '20px'; // 최상위일 때 여백 확보
+            }
 
             dataList.forEach(item => {
                 const el = document.createElement('div');
@@ -158,13 +209,20 @@
                         <div class="icon-box"><i data-lucide="folder" class="folder-icon"></i></div>
                         <span class="label">${item.name}</span>
                     `;
-                    el.onclick = () => renderGrid(item.children);
+                    el.onclick = () => {
+                        currentFolderStack.push(item); // 현재 폴더를 스택에 추가
+                        renderGrid(item.children); // 자식 목록 그리기
+                    };
                 } else {
+                    // 1순위: 파일 내부 ICON 속성 (데이터 URL), 2순위: 구글 파비콘 API
                     const domain = new URL(item.url).hostname;
+                    let faviconUrl = item.icon || `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+
                     el.innerHTML = `
-                        <a href="${item.url}" target="_blank" class="item" style="margin-bottom:0">
+                        <a href="${item.url}" target="_self" class="item" style="margin-bottom:0">
                             <div class="icon-box">
-                                <img class="favicon-img" src="https://www.google.com/s2/favicons?domain=${domain}&sz=128" onerror="this.src='https://www.google.com/s2/favicons?domain=${domain}&sz=64'">
+                                <img class="favicon-img" src="${faviconUrl}" 
+                                     onerror="handleFaviconError(this, '${domain}')">
                             </div>
                             <span class="label">${item.name}</span>
                         </a>
@@ -173,6 +231,22 @@
                 grid.appendChild(el);
             });
             lucide.createIcons();
+        }
+
+        // Favicon 로드 실패 시 대체 로직
+        function handleFaviconError(img, domain) {
+            if (img.src.includes('sz=128')) {
+                // 64px 크기로 2차 시도
+                img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+            } else {
+                // 최종 실패 시 기본 링크 아이콘으로 대체
+                img.style.display = 'none';
+                const backupDiv = document.createElement('div');
+                backupDiv.className = 'backup-icon';
+                backupDiv.innerHTML = '<i data-lucide="link"></i>';
+                img.parentElement.appendChild(backupDiv);
+                lucide.createIcons();
+            }
         }
 
         window.onload = init;
