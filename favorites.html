@@ -20,76 +20,49 @@
             color: #ffffff;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             padding: 30px 10px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            display: flex; flex-direction: column; align-items: center;
         }
 
         h1 {
-            color: var(--title-color);
-            font-size: 1.5rem;
-            font-weight: 800;
-            width: 100%;
-            max-width: 340px;
-            margin-bottom: 25px;
-            padding-left: 5px;
+            color: var(--title-color); font-size: 1.5rem; font-weight: 800;
+            width: 100%; max-width: 340px; margin-bottom: 25px; padding-left: 5px;
         }
 
-        .back-bar {
-            width: 100%;
-            max-width: 340px;
-            text-align: left;
-            padding: 10px 10px 20px 10px;
-            display: none;
-        }
-
-        .back-btn {
-            background: none; border: none; color: #fff;
-            font-size: 0.9rem; font-weight: 600; cursor: pointer;
-            display: flex; align-items: center; gap: 4px;
+        .back-bar { width: 100%; max-width: 340px; margin-bottom: 20px; display: none; }
+        .back-btn { 
+            background: none; border: none; color: #fff; font-size: 0.9rem; 
+            display: flex; align-items: center; gap: 4px; cursor: pointer;
         }
 
         #bookmarkGrid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr); 
-            gap: 12px 8px;
-            width: 100%;
-            max-width: 340px;
+            display: grid; grid-template-columns: repeat(4, 1fr); 
+            gap: 15px 10px; width: 100%; max-width: 340px;
         }
 
-        .item {
-            display: flex; flex-direction: column; align-items: center;
-            text-decoration: none; color: inherit; width: 100%; min-width: 0;
-        }
+        .item { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: inherit; width: 100%; min-width: 0; }
 
+        /* 아이콘 박스 */
         .icon-box {
-            width: 100%;
-            max-width: 58px; 
-            aspect-ratio: 1 / 1;
-            background-color: var(--tile-bg);
-            border-radius: 16px;
+            width: 100%; max-width: 58px; aspect-ratio: 1 / 1;
+            background-color: var(--tile-bg); border-radius: 16px;
             display: flex; justify-content: center; align-items: center;
-            overflow: hidden;
-            border: 1px solid #2a2a2a;
+            overflow: hidden; border: 1px solid #2a2a2a; position: relative;
         }
 
-        /* 아이콘 선명도 강제 향상 */
+        /* 1. 선명도 해결: 이미지 렌더링 최적화 */
         .favicon-img {
             width: 100%; height: 100%; object-fit: cover;
             image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
+            display: none; /* 로드 전까지 숨김 */
         }
         
-        /* GitHub 전용 반전 필터 */
-        .invert-white {
-            filter: invert(1) brightness(2);
-        }
+        /* 2. GitHub 하얀색 반전 (확실한 필터) */
+        .invert-white { filter: invert(1) brightness(100%) !important; }
 
-        /* 알파벳 대체 아이콘 */
-        .char-icon {
-            font-size: 24px; font-weight: 800;
-            color: #ffffff; text-transform: uppercase;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        /* 3. 알파벳 아이콘 (기본 배경) */
+        .char-placeholder {
+            font-size: 22px; font-weight: 800; color: #555;
+            text-transform: uppercase; user-select: none;
         }
 
         .folder-icon { color: #fff; width: 26px; height: 26px; }
@@ -97,8 +70,7 @@
         .label {
             font-size: 10px; color: var(--text-dim); text-align: center;
             width: 100%; margin-top: 7px; display: block;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            padding: 0 3px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px;
         }
     </style>
 </head>
@@ -118,11 +90,12 @@
                 const text = await response.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(text, 'text/html');
+                // 폴더 구조 파싱
                 const qaHeader = Array.from(doc.querySelectorAll('h3, dt')).find(el => el.textContent.includes('Quick Access'));
                 const mainDL = qaHeader.closest('dt').querySelector('dl');
                 bookmarkData = parseDL(mainDL);
                 renderGrid(bookmarkData);
-            } catch (err) { console.error("Load Error"); }
+            } catch (err) { document.body.innerHTML += "<p style='color:red; margin-top:20px;'>파일 로드 오류</p>"; }
 
             document.getElementById('backBtn').onclick = () => {
                 currentFolderStack.pop();
@@ -161,17 +134,21 @@
                     el.onclick = () => { currentFolderStack.push(item); renderGrid(item.children); };
                 } else {
                     const domain = new URL(item.url).hostname;
-                    // Google의 새로운 고화질 파비콘 서비스 주소로 변경
-                    const highResFavicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=256`;
+                    const cleanDomain = domain.replace('www.', '');
+                    const firstChar = cleanDomain.charAt(0);
                     const isGithub = domain.includes('github.com');
+                    
+                    // 우선순위: 1. 북마크 내장 ICON, 2. DuckDuckGo (선명함), 3. Google 고화질
+                    const iconUrl = item.icon || `https://icons.duckduckgo.com/ip3/${domain}.ico`;
 
                     el.innerHTML = `
                         <a href="${item.url}" target="_self" class="item">
                             <div class="icon-box">
+                                <span class="char-placeholder">${firstChar}</span>
                                 <img class="favicon-img ${isGithub ? 'invert-white' : ''}" 
-                                     src="${item.icon || highResFavicon}" 
-                                     onload="this.style.opacity=1"
-                                     onerror="handleIconError(this, '${domain}')">
+                                     src="${iconUrl}" 
+                                     onload="handleLoad(this)"
+                                     onerror="handleError(this, '${domain}')">
                             </div>
                             <span class="label">${item.name}</span>
                         </a>`;
@@ -181,19 +158,21 @@
             lucide.createIcons();
         }
 
-        function handleIconError(img, domain) {
-            // 이미 알파벳으로 변환된 경우 중복 실행 방지
-            if (img.dataset.failed) return;
-            img.dataset.failed = "true";
+        function handleLoad(img) {
+            // 이미지 로드 성공 시 알파벳 숨기고 이미지 표시
+            img.style.display = 'block';
+            if(img.previousElementSibling) img.previousElementSibling.style.display = 'none';
+        }
 
-            const parent = img.parentElement;
-            img.style.display = 'none';
-            
-            const firstChar = domain.replace('www.', '').charAt(0).toUpperCase();
-            const charDiv = document.createElement('div');
-            charDiv.className = 'char-icon';
-            charDiv.textContent = firstChar;
-            parent.appendChild(charDiv);
+        function handleError(img, domain) {
+            // DuckDuckGo 실패 시 Google 고화질로 2차 시도
+            if (!img.dataset.triedGoogle) {
+                img.dataset.triedGoogle = "true";
+                img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+            } else {
+                // 둘 다 실패하면 그냥 알파벳 유지 (이미지 숨김 유지)
+                img.style.display = 'none';
+            }
         }
 
         window.onload = init;
