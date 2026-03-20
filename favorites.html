@@ -8,9 +8,10 @@
     <style>
         :root {
             --bg-color: #000000;
-            --tile-bg: #1a1a1a;
-            --title-color: #FFD700;
+            --tile-bg: #1a1a1a; /* 앱 아이콘 배경색 */
+            --title-color: #ffffff; /* 제목은 흰색 고딕 */
             --text-dim: #999999;
+            --folder-color: #ffffff; /* 폴더 아이콘 색상 */
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -18,7 +19,7 @@
         body {
             background-color: var(--bg-color);
             color: #ffffff;
-            font-family: -apple-system, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             padding: 30px 10px;
             display: flex;
             flex-direction: column;
@@ -27,20 +28,20 @@
 
         h1 {
             color: var(--title-color);
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             font-weight: 800;
             width: 100%;
-            max-width: 380px;
-            text-align: left;
-            padding-left: 10px;
+            max-width: 360px;
+            margin-bottom: 25px;
+            padding-left: 5px;
         }
 
         .back-bar {
             width: 100%;
-            max-width: 380px;
+            max-width: 360px;
             text-align: left;
             padding: 10px 10px 20px 10px;
-            display: none; /* 기본 숨김 */
+            display: none;
         }
 
         .back-btn {
@@ -60,7 +61,7 @@
             grid-template-columns: repeat(4, 1fr); 
             gap: 15px 10px;
             width: 100%;
-            max-width: 380px;
+            max-width: 360px;
             margin-top: 20px;
         }
 
@@ -82,23 +83,25 @@
             max-width: 65px;
             aspect-ratio: 1 / 1;
             background-color: var(--tile-bg);
-            border-radius: 18px;
+            border-radius: 18px; /* 보내주신 이미지의 둥글기 */
             display: flex;
             justify-content: center;
             align-items: center;
-            overflow: hidden;
+            overflow: hidden; /* 이미지 넘침 방지 */
             border: 1px solid #222;
+            transition: transform 0.1s;
         }
+
+        .item:active .icon-box { transform: scale(0.9); }
 
         .favicon-img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
-            /* 고해상도 이미지를 위해 여백 최소화 */
-            padding: 6px; 
+            object-fit: cover; /* 이미지를 박스에 꽉 채움 */
+            /* padding 제거: 이미지를 꽉 차게 보여주기 위함 */
         }
         
-        .folder-icon { color: #FFD700; width: 30px; height: 30px; }
+        .folder-icon { color: var(--folder-color); width: 28px; height: 28px; }
         .backup-icon { color: #444; width: 24px; height: 24px; }
 
         .label {
@@ -111,6 +114,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            padding: 0 4px;
         }
 
         .loading-status { color: #444; margin-top: 50px; font-size: 12px; }
@@ -136,6 +140,7 @@
         async function init() {
             const status = document.getElementById('status');
             try {
+                status.textContent = "데이터 불러오는 중...";
                 const response = await fetch('quetta-bookmarks.html');
                 if (!response.ok) throw new Error();
                 const text = await response.text();
@@ -188,7 +193,7 @@
             const backBar = document.getElementById('backBar');
             grid.innerHTML = ''; // 기존 목록 초기화
 
-            // [핵심] 폴더 전환 시 화면 맨 위로 스크롤
+            // 폴더 전환 시 화면 맨 위로 스크롤
             window.scrollTo({ top: 0, behavior: 'instant' }); 
 
             // 뒤로 가기 바 표시 여부 결정
@@ -205,6 +210,7 @@
                 el.className = 'item';
                 
                 if (item.type === 'folder') {
+                    // 폴더 아이콘 스타일 수정: 흰색 실루엣 느낌
                     el.innerHTML = `
                         <div class="icon-box"><i data-lucide="folder" class="folder-icon"></i></div>
                         <span class="label">${item.name}</span>
@@ -215,7 +221,7 @@
                     };
                 } else {
                     const domain = new URL(item.url).hostname;
-                    // [핵심] DuckDuckGo 파비콘 API (128px 고해상도) 최우선 사용
+                    // 선명한 고해상도 DuckDuckGo 파비콘 API 최우선 사용
                     let faviconUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
 
                     el.innerHTML = `
