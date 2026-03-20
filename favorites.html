@@ -37,7 +37,7 @@
 
         #bookmarkGrid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(4, 1fr); /* 가로 4개 */
             gap: 15px;
             width: 100%;
             max-width: 380px;
@@ -55,27 +55,24 @@
             width: 65px;
             height: 65px;
             background-color: var(--tile-bg);
-            border-radius: 16px;
+            border-radius: 18px; /* 아이폰 앱 느낌의 라운딩 */
             display: flex;
             justify-content: center;
             align-items: center;
             margin-bottom: 8px;
             overflow: hidden;
             transition: transform 0.1s;
+            border: 1px solid #222;
         }
 
         .item:active .icon-box { transform: scale(0.9); }
 
-        /* 파비콘 스타일 */
         .favicon-img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            padding: 12px; /* 아이콘이 너무 꽉 차지 않게 여백 */
+            padding: 14px; /* 파비콘이 너무 꽉 차지 않게 */
         }
-
-        /* 이미지가 없는 경우 보일 기본 아이콘 */
-        .backup-icon { color: #555; width: 24px; height: 24px; }
 
         .label {
             font-size: 10px;
@@ -92,84 +89,74 @@
 
     <h1>CH Favorites</h1>
     <div id="bookmarkGrid"></div>
-    <div id="status" style="color:#555; margin-top:20px;"></div>
+    <div id="status" style="color:#444; margin-top:30px; font-size:12px;"></div>
 
     <script>
-        async function loadBookmarks() {
+        async function init() {
             const grid = document.getElementById('bookmarkGrid');
             const status = document.getElementById('status');
 
             try {
+                // 1. 파일 읽기
                 const response = await fetch('quetta-bookmarks.html');
-                if (!response.ok) throw new Error("파일 로드 실패");
-
-                const text = await response.text();
+                if (!response.ok) throw new Error("파일을 찾을 수 없습니다.");
+                
+                const rawHtml = await response.text();
                 const parser = new DOMParser();
-                const doc = parser.parseFromString(text, 'text/html');
+                const doc = parser.parseFromString(rawHtml, 'text/html');
 
-                // 1. "Quick Access" 텍스트를 포함한 헤더 찾기
-                const headers = Array.from(doc.querySelectorAll('h3, h2, h1, dt'));
-                const qaHeader = headers.find(h => h.textContent.trim().includes('Quick Access'));
+                // 2. "Quick Access" 섹션 찾기
+                // 모든 요소를 순회하며 텍스트가 일치하는 부모 노드 확보
+                const allElements = Array.from(doc.querySelectorAll('h3, h2, h1, dt, th, td'));
+                const qaTarget = allElements.find(el => el.textContent.includes('Quick Access'));
 
-                if (!qaHeader) {
-                    status.textContent = "Quick Access 섹션을 찾을 수 없습니다.";
+                if (!qaTarget) {
+                    status.textContent = "Quick Access 섹션을 찾지 못했습니다.";
                     return;
                 }
 
-                // 2. 해당 헤더 바로 다음에 오는 링크 컨테이너(DL)에서 <a>만 모두 추출
-                // 보통 구조: <DT><H3>Quick Access</H3><DL>...</DL></DT>
-                let links = [];
-                let nextEl = qaHeader.nextElementSibling;
-                
-                // 만약 바로 다음 요소가 없으면 부모로 올라가서 찾음 (브라우저마다 파싱 구조가 다름)
-                if (!nextEl || nextEl.tagName !== 'DL') {
-                    nextEl = qaHeader.parentElement.querySelector('dl');
-                }
-
-                if (nextEl) {
-                    links = Array.from(nextEl.querySelectorAll('a'));
-                } else {
-                    // 최후의 수단: 헤더 이후의 모든 링크 중 다음 헤더가 나오기 전까지 추출
-                    let sibling = qaHeader.nextElementSibling;
-                    while (sibling && !['H1','H2','H3'].includes(sibling.tagName)) {
-                        const foundLinks = sibling.querySelectorAll('a');
-                        foundLinks.forEach(l => links.push(l));
-                        sibling = sibling.nextElementSibling;
-                    }
-                }
+                // 3. 해당 섹션 '이후'에 나오는 <a> 태그들만 필터링
+                // 헤더가 포함된 부모 컨테이너(보통 <DT>) 또는 그 다음 형제 요소에서 링크 추출
+                const parentContainer = qaTarget.closest('dt') || qaTarget.parentElement;
+                const links = parentContainer.querySelectorAll('a');
 
                 if (links.length === 0) {
-                    status.textContent = "Quick Access 폴더가 비어있습니다.";
+                    status.textContent = "표시할 링크가 없습니다.";
                     return;
                 }
 
+                // 4. 그리드 생성
                 links.forEach(link => {
                     const name = link.textContent.trim();
                     const url = link.href;
-                    // 고해상도 파비콘 서비스 이용 (128px)
-                    const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`;
+                    if (!url || url.startsWith('javascript:')) return;
 
-                    const item = document.createElement('a');
-                    item.href = url;
-                    item.className = 'item';
-                    item.innerHTML = `
+                    // 구글 파비콘 API (고해상도 128px 요청)
+                    const domain = new URL(url).hostname;
+                    const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+
+                    const anchor = document.createElement('a');
+                    anchor.href = url;
+                    anchor.className = 'item';
+                    anchor.innerHTML = `
                         <div class="icon-box">
-                            <img class="favicon-img" src="${faviconUrl}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                            <div class="backup-icon" style="display:none;"><i data-lucide="link"></i></div>
+                            <img class="favicon-img" src="${faviconUrl}" alt="" 
+                                 onerror="this.src='https://www.google.com/s2/favicons?domain=${domain}&sz=64'">
                         </div>
                         <span class="label">${name}</span>
                     `;
-                    grid.appendChild(item);
+                    grid.appendChild(anchor);
                 });
 
-                lucide.createIcons();
+                status.style.display = 'none';
 
             } catch (err) {
-                status.textContent = "에러: quetta-bookmarks.html 파일이나 서버 상태를 확인하세요.";
+                status.textContent = "서버 오류: quetta-bookmarks.html 파일 확인이 필요합니다.";
+                console.error(err);
             }
         }
 
-        window.onload = loadBookmarks;
+        window.onload = init;
     </script>
 </body>
 </html>
