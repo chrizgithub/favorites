@@ -12,7 +12,7 @@
     --bg-color: #121212;
     --tile-bg: #1e1e1e;
     --title-color: #ffd740;
-    --text-dim: #999;
+    --text-dim: #9a9a9a;
 }
 
 * {
@@ -30,6 +30,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    overflow-x: hidden; /* 가로 스크롤 차단 */
 }
 
 h1 {
@@ -75,6 +76,8 @@ h1 {
     align-items: center;
     text-decoration: none;
     color: inherit;
+    width: 100%;
+    min-width: 0; /* ⭐ 가로 확장 방지 핵심 */
 }
 
 .icon-box {
@@ -91,10 +94,11 @@ h1 {
 }
 
 .favicon-img {
-    width: 70%;
-    height: 70%;
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* 다시 꽉 차게 */
     position: absolute;
+    inset: 0;
     z-index: 2;
 }
 
@@ -117,12 +121,17 @@ h1 {
 .label {
     font-size: 10px;
     color: var(--text-dim);
-    margin-top: 7px;
+    margin-top: 6px;
     width: 100%;
+    max-width: 100%;
     text-align: center;
-    white-space: nowrap;
+
+    display: -webkit-box;
+    -webkit-line-clamp: 2;      /* ⭐ 2줄 제한 */
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
 }
 
 .folder-icon {
@@ -153,8 +162,7 @@ function hashColor(str) {
     for (let i = 0; i < str.length; i++) {
         hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const hue = Math.abs(hash) % 360;
-    return `hsl(${hue}, 60%, 45%)`;
+    return `hsl(${Math.abs(hash) % 360}, 60%, 45%)`;
 }
 
 function faviconKey(domain) {
