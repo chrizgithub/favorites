@@ -9,38 +9,16 @@
         :root {
             --bg-color: #121212; 
             --tile-bg: #1e1e1e;
-            --title-color: #ffffff; 
             --text-dim: #999999;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-        body {
-            background-color: var(--bg-color);
-            color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            padding: 30px 10px;
-            display: flex; flex-direction: column; align-items: center;
-        }
-
-        h1 {
-            color: var(--title-color); font-size: 1.5rem; font-weight: 800;
-            width: 100%; max-width: 340px; margin-bottom: 25px; padding-left: 5px;
-        }
-
+        body { background-color: var(--bg-color); color: #fff; font-family: -apple-system, sans-serif; padding: 30px 10px; display: flex; flex-direction: column; align-items: center; }
+        h1 { font-size: 1.5rem; font-weight: 800; width: 100%; max-width: 340px; margin-bottom: 25px; padding-left: 5px; }
         .back-bar { width: 100%; max-width: 340px; margin-bottom: 20px; display: none; }
-        .back-btn { 
-            background: none; border: none; color: #fff; font-size: 0.9rem; 
-            display: flex; align-items: center; gap: 4px; cursor: pointer;
-        }
-
-        #bookmarkGrid {
-            display: grid; grid-template-columns: repeat(4, 1fr); 
-            gap: 15px 10px; width: 100%; max-width: 340px;
-        }
-
-        .item { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: inherit; width: 100%; min-width: 0; }
-
+        #bookmarkGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px 10px; width: 100%; max-width: 340px; }
+        .item { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: inherit; width: 100%; }
+        
         /* 아이콘 박스 */
         .icon-box {
             width: 100%; max-width: 58px; aspect-ratio: 1 / 1;
@@ -49,35 +27,30 @@
             overflow: hidden; border: 1px solid #2a2a2a; position: relative;
         }
 
-        /* 1. 선명도 해결: 이미지 렌더링 최적화 */
+        /* 1. 선명도 및 필터 */
         .favicon-img {
             width: 100%; height: 100%; object-fit: cover;
             image-rendering: -webkit-optimize-contrast;
-            display: none; /* 로드 전까지 숨김 */
+            opacity: 0; /* 로딩 전엔 아예 투명하게 */
+            transition: opacity 0.2s;
         }
         
-        /* 2. GitHub 하얀색 반전 (확실한 필터) */
-        .invert-white { filter: invert(1) brightness(100%) !important; }
+        /* 2. GitHub 하얀색 강제 반전 */
+        .github-invert { filter: invert(1) brightness(2) !important; }
 
-        /* 3. 알파벳 아이콘 (기본 배경) */
+        /* 3. 알파벳 플레이스홀더 (이미지 실패 시 노출) */
         .char-placeholder {
-            font-size: 22px; font-weight: 800; color: #555;
-            text-transform: uppercase; user-select: none;
+            position: absolute; font-size: 24px; font-weight: 800; color: #ffffff;
+            text-transform: uppercase; z-index: 1;
         }
 
         .folder-icon { color: #fff; width: 26px; height: 26px; }
-
-        .label {
-            font-size: 10px; color: var(--text-dim); text-align: center;
-            width: 100%; margin-top: 7px; display: block;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px;
-        }
+        .label { font-size: 10px; color: var(--text-dim); text-align: center; width: 100%; margin-top: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     </style>
 </head>
 <body>
-
     <h1>CH Favorites</h1>
-    <div class="back-bar" id="backBar"><button class="back-btn" id="backBtn"><i data-lucide="chevron-left"></i> 뒤로</button></div>
+    <div class="back-bar" id="backBar"><button onclick="goBack()" style="background:none; border:none; color:#fff; cursor:pointer;">[뒤로]</button></div>
     <div id="bookmarkGrid"></div>
 
     <script>
@@ -86,93 +59,79 @@
 
         async function init() {
             try {
-                const response = await fetch('quetta-bookmarks.html');
-                const text = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(text, 'text/html');
-                // 폴더 구조 파싱
-                const qaHeader = Array.from(doc.querySelectorAll('h3, dt')).find(el => el.textContent.includes('Quick Access'));
-                const mainDL = qaHeader.closest('dt').querySelector('dl');
-                bookmarkData = parseDL(mainDL);
+                const res = await fetch('quetta-bookmarks.html');
+                const text = await res.text();
+                const doc = new DOMParser().parseFromString(text, 'text/html');
+                const qa = Array.from(doc.querySelectorAll('h3, dt')).find(el => el.textContent.includes('Quick Access'));
+                bookmarkData = parseDL(qa.closest('dt').querySelector('dl'));
                 renderGrid(bookmarkData);
-            } catch (err) { document.body.innerHTML += "<p style='color:red; margin-top:20px;'>파일 로드 오류</p>"; }
-
-            document.getElementById('backBtn').onclick = () => {
-                currentFolderStack.pop();
-                renderGrid(currentFolderStack.length > 0 ? currentFolderStack[currentFolderStack.length-1].children : bookmarkData);
-            };
+            } catch (e) { console.error("파일 로딩 실패"); }
         }
 
         function parseDL(dl) {
             let data = [];
             if (!dl) return data;
             dl.querySelectorAll(':scope > dt').forEach(dt => {
-                const h3 = dt.querySelector(':scope > h3');
-                const a = dt.querySelector(':scope > a');
-                if (h3) {
-                    data.push({ type: 'folder', name: h3.textContent.trim(), children: parseDL(dt.querySelector('dl')) });
-                } else if (a) {
-                    data.push({ type: 'link', name: a.textContent.trim(), url: a.href, icon: a.getAttribute('ICON') });
-                }
+                const h3 = dt.querySelector(':scope > h3'), a = dt.querySelector(':scope > a');
+                if (h3) data.push({ type: 'folder', name: h3.textContent.trim(), children: parseDL(dt.querySelector('dl')) });
+                else if (a) data.push({ type: 'link', name: a.textContent.trim(), url: a.href, icon: a.getAttribute('ICON') });
             });
             return data;
         }
 
-        function renderGrid(dataList) {
+        function renderGrid(list) {
             const grid = document.getElementById('bookmarkGrid');
-            const backBar = document.getElementById('backBar');
             grid.innerHTML = '';
+            document.getElementById('backBar').style.display = currentFolderStack.length ? 'block' : 'none';
             window.scrollTo(0, 0);
-            backBar.style.display = currentFolderStack.length > 0 ? 'block' : 'none';
 
-            dataList.forEach(item => {
-                const el = document.createElement('div');
-                el.className = 'item';
-                
+            list.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'item';
                 if (item.type === 'folder') {
-                    el.innerHTML = `<div class="icon-box"><i data-lucide="folder" class="folder-icon"></i></div><span class="label">${item.name}</span>`;
-                    el.onclick = () => { currentFolderStack.push(item); renderGrid(item.children); };
+                    div.innerHTML = `<div class="icon-box"><i data-lucide="folder" class="folder-icon"></i></div><span class="label">${item.name}</span>`;
+                    div.onclick = () => { currentFolderStack.push(item); renderGrid(item.children); };
                 } else {
                     const domain = new URL(item.url).hostname;
-                    const cleanDomain = domain.replace('www.', '');
-                    const firstChar = cleanDomain.charAt(0);
-                    const isGithub = domain.includes('github.com');
-                    
-                    // 우선순위: 1. 북마크 내장 ICON, 2. DuckDuckGo (선명함), 3. Google 고화질
+                    const char = domain.replace('www.', '').charAt(0).toUpperCase();
+                    // 4대 고해상도 시도 (순서: 내장ICON -> DuckDuckGo -> Google -> 픽셀아이콘)
+                    const apiIdx = Math.floor(Math.random() * 2); // API 분산
                     const iconUrl = item.icon || `https://icons.duckduckgo.com/ip3/${domain}.ico`;
 
-                    el.innerHTML = `
-                        <a href="${item.url}" target="_self" class="item">
+                    div.innerHTML = `
+                        <a href="${item.url}" class="item">
                             <div class="icon-box">
-                                <span class="char-placeholder">${firstChar}</span>
-                                <img class="favicon-img ${isGithub ? 'invert-white' : ''}" 
-                                     src="${iconUrl}" 
-                                     onload="handleLoad(this)"
-                                     onerror="handleError(this, '${domain}')">
+                                <span class="char-placeholder">${char}</span>
+                                <img class="favicon-img ${domain.includes('github.com') ? 'github-invert' : ''}" 
+                                     src="${iconUrl}" onload="showImg(this)" onerror="switchApi(this, '${domain}')">
                             </div>
                             <span class="label">${item.name}</span>
                         </a>`;
                 }
-                grid.appendChild(el);
+                grid.appendChild(div);
             });
             lucide.createIcons();
         }
 
-        function handleLoad(img) {
-            // 이미지 로드 성공 시 알파벳 숨기고 이미지 표시
-            img.style.display = 'block';
-            if(img.previousElementSibling) img.previousElementSibling.style.display = 'none';
+        function showImg(img) {
+            // 이미지가 너무 작거나(지구본) 로드 실패하면 그냥 알파벳 보여줌
+            if (img.naturalWidth < 17) return; 
+            img.style.opacity = "1";
+            img.previousElementSibling.style.display = "none"; 
         }
 
-        function handleError(img, domain) {
-            // DuckDuckGo 실패 시 Google 고화질로 2차 시도
-            if (!img.dataset.triedGoogle) {
-                img.dataset.triedGoogle = "true";
+        function switchApi(img, domain) {
+            if (!img.dataset.retry) {
+                img.dataset.retry = "1";
                 img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
             } else {
-                // 둘 다 실패하면 그냥 알파벳 유지 (이미지 숨김 유지)
-                img.style.display = 'none';
+                img.style.display = 'none'; // 다 실패하면 알파벳만
             }
+        }
+
+        function goBack() {
+            currentFolderStack.pop();
+            renderGrid(currentFolderStack.length ? currentFolderStack[currentFolderStack.length-1].children : bookmarkData);
         }
 
         window.onload = init;
