@@ -10,7 +10,7 @@
 <style>
 :root {
     --bg-color: #121212;
-    --tile-bg: #1e1e1e;     /* 아이콘 배경 통일 */
+    --tile-bg: #1e1e1e;
     --title-color: #ffd740;
     --text-dim: #9a9a9a;
 }
@@ -106,7 +106,6 @@ h1 {
     filter: invert(1) brightness(2);
 }
 
-/* 파비콘 없을 때 알파벳 */
 .char-placeholder {
     width: 100%;
     height: 100%;
@@ -116,7 +115,7 @@ h1 {
     justify-content: center;
     align-items: center;
     text-transform: uppercase;
-    background: var(--tile-bg); /* 배경 통일 */
+    background: var(--tile-bg);
     color: #ffffff;
     z-index: 1;
 }
@@ -159,16 +158,29 @@ h1 {
 let bookmarkData = [];
 let currentFolderStack = [];
 
+/* 🔹 상위 도메인 추출 */
+function getRootDomain(hostname) {
+    const parts = hostname.replace(/^www\./, '').split('.');
+    return parts.length > 2
+        ? parts.slice(-2).join('.')
+        : parts.join('.');
+}
+
 function faviconKey(domain) {
     return `favicon-ok:${domain}`;
 }
 
+/* 🔹 파비콘 정상 로드시 알파벳 제거 */
 function checkFavicon(img, domain) {
     if (img.naturalWidth < 24 || img.naturalHeight < 24) {
         localStorage.setItem(faviconKey(domain), '0');
         img.remove();
     } else {
         localStorage.setItem(faviconKey(domain), '1');
+        const placeholder = img.previousElementSibling;
+        if (placeholder && placeholder.classList.contains('char-placeholder')) {
+            placeholder.remove();
+        }
     }
 }
 
@@ -231,7 +243,8 @@ function renderGrid(list) {
                 renderGrid(item.children);
             };
         } else {
-            const domain = new URL(item.url).hostname.replace('www.', '');
+            const host = new URL(item.url).hostname;
+            const domain = getRootDomain(host);
             const firstChar = domain[0].toUpperCase();
 
             const ok = localStorage.getItem(faviconKey(domain));
