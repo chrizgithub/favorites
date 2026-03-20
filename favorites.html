@@ -100,6 +100,16 @@ h1 {
     position: absolute;
     inset: 0;
     z-index: 2;
+    /* 업스케일 시 선명도 유지 */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* 작은 아이콘(16~32px)은 픽셀 뭉개짐 방지를 위해 패딩+contain */
+.favicon-img.small-icon {
+    object-fit: contain;
+    padding: 10px;
+    image-rendering: pixelated;
 }
 
 .github-invert {
@@ -158,32 +168,93 @@ h1 {
 let bookmarkData = [];
 let currentFolderStack = [];
 
-/* 🔹 상위 도메인 추출 */
+/* ── 도메인 추출 ── */
 function getRootDomain(hostname) {
     const parts = hostname.replace(/^www\./, '').split('.');
-    return parts.length > 2
-        ? parts.slice(-2).join('.')
-        : parts.join('.');
+    return parts.length > 2 ? parts.slice(-2).join('.') : parts.join('.');
 }
 
-function faviconKey(domain) {
-    return `favicon-ok:${domain}`;
+/* ── 캐시 키 ── */
+const CACHE_VER = 'v2:';                          // 버전 올려 낡은 캐시 자동 무시
+function cacheKey(domain) { return `fav:${CACHE_VER}${domain}`; }
+
+/* ── 소스 순서 (고화질 → 범용) ── */
+function faviconSources(domain) {
+    return [
+        `https://${domain}/apple-touch-icon.png`,
+        `https://${domain}/apple-touch-icon-precomposed.png`,
+        `https://logo.clearbit.com/${domain}`,                                      // 로고 (고화질 PNG)
+        `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,               // Google 128px
+        `https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON` +
+            `&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=128`,          // Google V2
+        `https://icons.duckduckgo.com/ip3/${domain}.ico`,                           // DuckDuckGo
+        `https://${domain}/favicon.png`,
+        `https://${domain}/favicon.ico`,
+    ];
 }
 
-/* 🔹 파비콘 정상 로드시 알파벳 제거 */
-function checkFavicon(img, domain) {
-    if (img.naturalWidth < 24 || img.naturalHeight < 24) {
-        localStorage.setItem(faviconKey(domain), '0');
-        img.remove();
-    } else {
-        localStorage.setItem(faviconKey(domain), '1');
-        const placeholder = img.previousElementSibling;
-        if (placeholder && placeholder.classList.contains('char-placeholder')) {
-            placeholder.remove();
-        }
+/* ── 이미지 한 장 로드 테스트 (Promise) ── */
+function tryLoad(src, minSize = 16) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        // CORS 없이 로드 (display only)
+        img.onload = () => {
+            if (img.naturalWidth >= minSize && img.naturalHeight >= minSize) {
+                resolve({ src, w: img.naturalWidth, h: img.naturalHeight });
+            } else {
+                reject(new Error('too small'));
+            }
+        };
+        img.onerror = () => reject(new Error('load error'));
+        img.src = src;
+    });
+}
+
+/* ── Waterfall: 성공하는 첫 번째 소스 사용 ── */
+async function resolveFavicon(domain) {
+    const cached = localStorage.getItem(cacheKey(domain));
+    if (cached) {
+        try {
+            return JSON.parse(cached);          // { src, w, h }
+        } catch { /* 손상 캐시 무시 */ }
     }
+
+    const sources = faviconSources(domain);
+
+    for (const src of sources) {
+        try {
+            // apple-touch-icon 등 고화질 소스는 24px 이상 요구
+            // ico/favicon 등 후반부 소스는 16px도 허용
+            const minSize = src.includes('favicon') ? 16 : 24;
+            const result = await tryLoad(src, minSize);
+            localStorage.setItem(cacheKey(domain), JSON.stringify(result));
+            return result;
+        } catch { /* 다음 소스 시도 */ }
+    }
+
+    localStorage.setItem(cacheKey(domain), JSON.stringify(null));
+    return null;
 }
 
+/* ── 아이콘 박스에 이미지 주입 ── */
+function applyFavicon(iconBox, domain, result) {
+    if (!result) return;                        // 모든 소스 실패 → 알파벳 유지
+
+    const placeholder = iconBox.querySelector('.char-placeholder');
+    const img = document.createElement('img');
+    img.className = 'favicon-img';
+    if (domain.includes('github.com')) img.classList.add('github-invert');
+
+    // 작은 아이콘(≤32px)은 contain + padding으로 선명하게
+    if (result.w <= 32 || result.h <= 32) img.classList.add('small-icon');
+
+    img.src = result.src;
+    iconBox.appendChild(img);
+
+    if (placeholder) placeholder.remove();
+}
+
+/* ── 초기화 ── */
 async function init() {
     try {
         const res = await fetch('quetta-bookmarks.html');
@@ -201,29 +272,20 @@ async function init() {
 function parseDL(dl) {
     const data = [];
     if (!dl) return data;
-
     dl.querySelectorAll(':scope > dt').forEach(dt => {
         const h3 = dt.querySelector(':scope > h3');
-        const a = dt.querySelector(':scope > a');
+        const a  = dt.querySelector(':scope > a');
         if (h3) {
-            data.push({
-                type: 'folder',
-                name: h3.textContent.trim(),
-                children: parseDL(dt.querySelector('dl'))
-            });
+            data.push({ type: 'folder', name: h3.textContent.trim(), children: parseDL(dt.querySelector('dl')) });
         } else if (a) {
-            data.push({
-                type: 'link',
-                name: a.textContent.trim(),
-                url: a.href
-            });
+            data.push({ type: 'link', name: a.textContent.trim(), url: a.href });
         }
     });
     return data;
 }
 
 function renderGrid(list) {
-    const grid = document.getElementById('bookmarkGrid');
+    const grid    = document.getElementById('bookmarkGrid');
     const backBar = document.getElementById('backBar');
     grid.innerHTML = '';
     backBar.style.display = currentFolderStack.length ? 'block' : 'none';
@@ -243,26 +305,34 @@ function renderGrid(list) {
                 renderGrid(item.children);
             };
         } else {
-            const host = new URL(item.url).hostname;
-            const domain = getRootDomain(host);
-            const firstChar = domain[0].toUpperCase();
+            let host, domain;
+            try {
+                host   = new URL(item.url).hostname;
+                domain = getRootDomain(host);
+            } catch { return; }
 
-            const ok = localStorage.getItem(faviconKey(domain));
-            const appleIcon = `https://${domain}/apple-touch-icon.png`;
-            const googleIcon = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+            const firstChar = domain[0].toUpperCase();
 
             wrapper.innerHTML = `
             <a href="${item.url}" class="item">
                 <div class="icon-box">
                     <div class="char-placeholder">${firstChar}</div>
-                    ${ok !== '0' ? `
-                    <img class="favicon-img ${domain.includes('github.com') ? 'github-invert' : ''}"
-                         src="${appleIcon}"
-                         onerror="this.src='${googleIcon}'"
-                         onload="checkFavicon(this, '${domain}')">` : ''}
                 </div>
                 <span class="label">${item.name}</span>
             </a>`;
+
+            const iconBox = wrapper.querySelector('.icon-box');
+
+            // 캐시에 이미 있으면 즉시 표시, 없으면 비동기 로드
+            const cached = localStorage.getItem(cacheKey(domain));
+            if (cached) {
+                try {
+                    const result = JSON.parse(cached);
+                    if (result) applyFavicon(iconBox, domain, result);
+                } catch { /* 무시 */ }
+            } else {
+                resolveFavicon(domain).then(result => applyFavicon(iconBox, domain, result));
+            }
         }
         grid.appendChild(wrapper);
     });
