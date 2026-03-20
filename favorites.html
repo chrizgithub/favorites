@@ -15,17 +15,16 @@
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg-color); color: #fff; font-family: -apple-system, sans-serif; padding: 30px 10px; display: flex; flex-direction: column; align-items: center; }
         
-        h1 { font-size: 1.5rem; font-weight: 800; width: 100%; max-width: 340px; margin-bottom: 25px; padding-left: 5px; }
+        h1 { font-size: 1.5rem; font-weight: 800; width: 100%; max-width: 340px; margin-bottom: 25px; padding-left: 5px; color: #ffffff; }
         
-        /* 뒤로가기 바 */
         .back-bar { width: 100%; max-width: 340px; margin-bottom: 20px; display: none; }
-        .back-btn { background:none; border:none; color:#fff; cursor:pointer; display:flex; align-items:center; gap:4px; font-weight:600; }
+        .back-btn { background:none; border:none; color:#fff; cursor:pointer; display:flex; align-items:center; gap:4px; font-weight:600; font-size: 0.9rem; }
 
-        /* 그리드 시스템 (4열 유지) */
+        /* [그리드 복구] 무조건 4열 고정 */
         #bookmarkGrid { 
             display: grid; 
             grid-template-columns: repeat(4, 1fr); 
-            gap: 15px 8px; 
+            gap: 15px 10px; 
             width: 100%; 
             max-width: 340px; 
         }
@@ -36,11 +35,11 @@
             align-items: center; 
             text-decoration: none; 
             color: inherit; 
-            width: 100%; 
-            min-width: 0; /* 그리드 내부 텍스트 생략을 위해 필수 */
+            width: 100%;
+            min-width: 0; /* 텍스트 생략용 */
         }
         
-        /* 아이콘 박스 (10% 축소 사이즈) */
+        /* [아이콘 박스] 크기 10% 축소 및 꽉 차게 설정 */
         .icon-box {
             width: 100%; 
             max-width: 58px; 
@@ -51,22 +50,23 @@
             overflow: hidden; border: 1px solid #2a2a2a; position: relative;
         }
 
+        /* [이미지 설정] 선명도 및 꽉 채우기 */
         .favicon-img {
             width: 100%; height: 100%; object-fit: cover;
             image-rendering: -webkit-optimize-contrast;
-            opacity: 0; transition: opacity 0.2s;
             position: absolute; top: 0; left: 0; z-index: 2;
         }
         
-        .github-invert { filter: invert(1) brightness(2) !important; }
+        /* [GitHub 반전] 확실하게 하얀색으로 */
+        .github-invert { filter: invert(1) brightness(1.5) !important; }
 
-        /* 알파벳 플레이스홀더 */
+        /* [알파벳 대체] 배경에 깔려있다가 이미지 실패 시 보임 */
         .char-placeholder {
             font-size: 24px; font-weight: 800; color: #555;
             text-transform: uppercase; z-index: 1;
         }
 
-        /* 텍스트 길면 생략 (...) */
+        /* [텍스트] 한 줄 생략 처리 */
         .label { 
             font-size: 10px; 
             color: var(--text-dim); 
@@ -76,7 +76,7 @@
             white-space: nowrap; 
             overflow: hidden; 
             text-overflow: ellipsis; 
-            padding: 0 2px;
+            padding: 0 4px;
         }
 
         .folder-icon { color: #fff; width: 26px; height: 26px; }
@@ -99,7 +99,7 @@
                 const qa = Array.from(doc.querySelectorAll('h3, dt')).find(el => el.textContent.includes('Quick Access'));
                 bookmarkData = parseDL(qa.closest('dt').querySelector('dl'));
                 renderGrid(bookmarkData);
-            } catch (e) { console.error("파일 로딩 실패"); }
+            } catch (e) { document.body.innerHTML += "<p style='padding:20px; color:gray;'>파일을 찾을 수 없습니다.</p>"; }
         }
 
         function parseDL(dl) {
@@ -128,15 +128,15 @@
                 } else {
                     const domain = new URL(item.url).hostname;
                     const char = domain.replace('www.', '').charAt(0).toUpperCase();
-                    // 1순위: 내장 아이콘, 2순위: 덕덕고 고해상도
-                    const iconUrl = item.icon || `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+                    // 선명도를 위해 구글 API 128px 고화질 모드 사용
+                    const iconUrl = item.icon || `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
 
                     div.innerHTML = `
                         <a href="${item.url}" class="item">
                             <div class="icon-box">
                                 <span class="char-placeholder">${char}</span>
                                 <img class="favicon-img ${domain.includes('github.com') ? 'github-invert' : ''}" 
-                                     src="${iconUrl}" onload="showImg(this)" onerror="switchApi(this, '${domain}')">
+                                     src="${iconUrl}" onerror="this.style.display='none'">
                             </div>
                             <span class="label">${item.name}</span>
                         </a>`;
@@ -144,20 +144,6 @@
                 grid.appendChild(div);
             });
             lucide.createIcons();
-        }
-
-        function showImg(img) {
-            // 저화질 지구본(16px)이면 무시하고 알파벳 노출
-            if (img.naturalWidth > 16) { 
-                img.style.opacity = "1";
-            }
-        }
-
-        function switchApi(img, domain) {
-            if (!img.dataset.retry) {
-                img.dataset.retry = "1";
-                img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-            }
         }
 
         function goBack() {
