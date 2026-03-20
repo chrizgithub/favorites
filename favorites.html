@@ -10,7 +10,7 @@
 <style>
 :root {
     --bg-color: #121212;
-    --tile-bg: #1e1e1e;
+    --tile-bg: #1e1e1e;     /* 아이콘 배경 통일 */
     --title-color: #ffd740;
     --text-dim: #9a9a9a;
 }
@@ -30,7 +30,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    overflow-x: hidden; /* 가로 스크롤 차단 */
+    overflow-x: hidden;
 }
 
 h1 {
@@ -77,7 +77,7 @@ h1 {
     text-decoration: none;
     color: inherit;
     width: 100%;
-    min-width: 0; /* ⭐ 가로 확장 방지 핵심 */
+    min-width: 0;
 }
 
 .icon-box {
@@ -96,7 +96,7 @@ h1 {
 .favicon-img {
     width: 100%;
     height: 100%;
-    object-fit: cover; /* 다시 꽉 차게 */
+    object-fit: cover;
     position: absolute;
     inset: 0;
     z-index: 2;
@@ -106,6 +106,7 @@ h1 {
     filter: invert(1) brightness(2);
 }
 
+/* 파비콘 없을 때 알파벳 */
 .char-placeholder {
     width: 100%;
     height: 100%;
@@ -115,6 +116,8 @@ h1 {
     justify-content: center;
     align-items: center;
     text-transform: uppercase;
+    background: var(--tile-bg); /* 배경 통일 */
+    color: #ffffff;
     z-index: 1;
 }
 
@@ -123,11 +126,10 @@ h1 {
     color: var(--text-dim);
     margin-top: 6px;
     width: 100%;
-    max-width: 100%;
     text-align: center;
 
     display: -webkit-box;
-    -webkit-line-clamp: 2;      /* ⭐ 2줄 제한 */
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     white-space: normal;
@@ -156,14 +158,6 @@ h1 {
 <script>
 let bookmarkData = [];
 let currentFolderStack = [];
-
-function hashColor(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return `hsl(${Math.abs(hash) % 360}, 60%, 45%)`;
-}
 
 function faviconKey(domain) {
     return `favicon-ok:${domain}`;
@@ -239,7 +233,6 @@ function renderGrid(list) {
         } else {
             const domain = new URL(item.url).hostname.replace('www.', '');
             const firstChar = domain[0].toUpperCase();
-            const bg = hashColor(domain);
 
             const ok = localStorage.getItem(faviconKey(domain));
             const appleIcon = `https://${domain}/apple-touch-icon.png`;
@@ -248,9 +241,7 @@ function renderGrid(list) {
             wrapper.innerHTML = `
             <a href="${item.url}" class="item">
                 <div class="icon-box">
-                    <div class="char-placeholder" style="background:${bg}">
-                        ${firstChar}
-                    </div>
+                    <div class="char-placeholder">${firstChar}</div>
                     ${ok !== '0' ? `
                     <img class="favicon-img ${domain.includes('github.com') ? 'github-invert' : ''}"
                          src="${appleIcon}"
