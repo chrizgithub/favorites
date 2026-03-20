@@ -2,168 +2,270 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>CH Favorites</title>
+
+<script src="https://unpkg.com/lucide@latest"></script>
 
 <style>
 :root {
-    --bg:#121212;
-    --tile:#1e1e1e;
-    --border:#2a2a2a;
-    --title:#ffd740;
-    --text-dim:#9a9a9a;
+    --bg-color: #121212;
+    --tile-bg: #1e1e1e;     /* 아이콘 배경 통일 */
+    --title-color: #ffd740;
+    --text-dim: #9a9a9a;
 }
 
-*{margin:0;padding:0;box-sizing:border-box}
-
-body{
-    background:var(--bg);
-    color:#fff;
-    font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-    padding:10px;
-    overflow-x:hidden;
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
 }
 
-h1{
-    color:var(--title);
-    font-size:1.4rem;
-    font-weight:800;
-    max-width:340px;
-    margin:10px auto 20px;
+body {
+    background: var(--bg-color);
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
 }
 
-#bookmarkGrid{
-    display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:15px 10px;
-    max-width:340px;
-    margin:0 auto;
+h1 {
+    color: var(--title-color);
+    font-size: 1.4rem;
+    font-weight: 800;
+    width: 100%;
+    max-width: 340px;
+    margin: 10px 0 20px;
+    padding-left: 5px;
 }
 
-.item{
-    text-decoration:none;
-    color:inherit;
-    min-width:0;
+.back-bar {
+    width: 100%;
+    max-width: 340px;
+    margin-bottom: 20px;
+    display: none;
 }
 
-.icon-box{
-    width:58px;
-    height:58px;
-    margin:0 auto;
-    background:var(--tile);
-    border-radius:16px;
-    border:1px solid var(--border);
-    overflow:hidden;
+.back-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
-.favicon{
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    background:var(--tile);
+#bookmarkGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px 10px;
+    width: 100%;
+    max-width: 340px;
 }
 
-.char{
-    width:100%;
-    height:100%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:22px;
-    font-weight:800;
+.item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    color: inherit;
+    width: 100%;
+    min-width: 0;
 }
 
-.label{
-    margin-top:6px;
-    font-size:10px;
-    color:var(--text-dim);
-    text-align:center;
-    display:-webkit-box;
-    -webkit-line-clamp:2;
-    -webkit-box-orient:vertical;
-    overflow:hidden;
+.icon-box {
+    width: 58px;
+    height: 58px;
+    background: var(--tile-bg);
+    border-radius: 16px;
+    border: 1px solid #2a2a2a;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.favicon-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+}
+
+.github-invert {
+    filter: invert(1) brightness(2);
+}
+
+/* 파비콘 없을 때 알파벳 */
+.char-placeholder {
+    width: 100%;
+    height: 100%;
+    font-size: 22px;
+    font-weight: 800;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-transform: uppercase;
+    background: var(--tile-bg); /* 배경 통일 */
+    color: #ffffff;
+    z-index: 1;
+}
+
+.label {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    width: 100%;
+    text-align: center;
+
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.folder-icon {
+    width: 26px;
+    height: 26px;
+    color: #fff;
 }
 </style>
 </head>
 
 <body>
 <h1>CH Favorites</h1>
+
+<div class="back-bar" id="backBar">
+    <button class="back-btn" onclick="goBack()">
+        <i data-lucide="chevron-left" size="18"></i> 뒤로
+    </button>
+</div>
+
 <div id="bookmarkGrid"></div>
 
 <script>
-function rootDomain(host){
-    const p=host.replace(/^www\./,'').split('.');
-    return p.length>2?p.slice(-2).join('.'):p.join('.');
+let bookmarkData = [];
+let currentFolderStack = [];
+
+function faviconKey(domain) {
+    return `favicon-ok:${domain}`;
 }
 
-async function init(){
-    const res=await fetch('quetta-bookmarks.html');
-    const txt=await res.text();
-    const doc=new DOMParser().parseFromString(txt,'text/html');
-    const qa=[...doc.querySelectorAll('h3,dt')]
-        .find(e=>e.textContent.includes('Quick Access'));
-    const list=parseDL(qa.closest('dt').querySelector('dl'));
-    render(list);
+function checkFavicon(img, domain) {
+    if (img.naturalWidth < 24 || img.naturalHeight < 24) {
+        localStorage.setItem(faviconKey(domain), '0');
+        img.remove();
+    } else {
+        localStorage.setItem(faviconKey(domain), '1');
+    }
 }
 
-function parseDL(dl){
-    const arr=[];
-    dl?.querySelectorAll(':scope>dt').forEach(dt=>{
-        const a=dt.querySelector('a');
-        if(a){
-            arr.push({
-                name:a.textContent.trim(),
-                url:a.href,
-                icon:a.getAttribute('ICON')
+async function init() {
+    try {
+        const res = await fetch('quetta-bookmarks.html');
+        const text = await res.text();
+        const doc = new DOMParser().parseFromString(text, 'text/html');
+        const qa = Array.from(doc.querySelectorAll('h3, dt'))
+            .find(el => el.textContent.includes('Quick Access'));
+        bookmarkData = parseDL(qa.closest('dt').querySelector('dl'));
+        renderGrid(bookmarkData);
+    } catch {
+        document.body.innerHTML += '<p style="color:gray">로딩 실패</p>';
+    }
+}
+
+function parseDL(dl) {
+    const data = [];
+    if (!dl) return data;
+
+    dl.querySelectorAll(':scope > dt').forEach(dt => {
+        const h3 = dt.querySelector(':scope > h3');
+        const a = dt.querySelector(':scope > a');
+        if (h3) {
+            data.push({
+                type: 'folder',
+                name: h3.textContent.trim(),
+                children: parseDL(dt.querySelector('dl'))
+            });
+        } else if (a) {
+            data.push({
+                type: 'link',
+                name: a.textContent.trim(),
+                url: a.href
             });
         }
     });
-    return arr;
+    return data;
 }
 
-function render(list){
-    const grid=document.getElementById('bookmarkGrid');
-    grid.innerHTML='';
+function renderGrid(list) {
+    const grid = document.getElementById('bookmarkGrid');
+    const backBar = document.getElementById('backBar');
+    grid.innerHTML = '';
+    backBar.style.display = currentFolderStack.length ? 'block' : 'none';
 
-    list.forEach(item=>{
-        const root=rootDomain(new URL(item.url).hostname);
-        const first=root[0].toUpperCase();
+    list.forEach(item => {
+        const wrapper = document.createElement('div');
 
-        const src=item.icon ||
-            `https://icons.duckduckgo.com/ip3/${root}.ico`;
+        if (item.type === 'folder') {
+            wrapper.className = 'item';
+            wrapper.innerHTML = `
+                <div class="icon-box">
+                    <i data-lucide="folder" class="folder-icon"></i>
+                </div>
+                <span class="label">${item.name}</span>`;
+            wrapper.onclick = () => {
+                currentFolderStack.push(item);
+                renderGrid(item.children);
+            };
+        } else {
+            const domain = new URL(item.url).hostname.replace('www.', '');
+            const firstChar = domain[0].toUpperCase();
 
-        const a=document.createElement('a');
-        a.className='item';
-        a.href=item.url;
+            const ok = localStorage.getItem(faviconKey(domain));
+            const appleIcon = `https://${domain}/apple-touch-icon.png`;
+            const googleIcon = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
 
-        const box=document.createElement('div');
-        box.className='icon-box';
-
-        const img=document.createElement('img');
-        img.className='favicon';
-        img.src=src;
-
-        img.onerror=()=>{
-            img.remove();
-            const c=document.createElement('div');
-            c.className='char';
-            c.textContent=first;
-            box.appendChild(c);
-        };
-
-        box.appendChild(img);
-        a.appendChild(box);
-
-        const label=document.createElement('div');
-        label.className='label';
-        label.textContent=item.name;
-        a.appendChild(label);
-
-        grid.appendChild(a);
+            wrapper.innerHTML = `
+            <a href="${item.url}" class="item">
+                <div class="icon-box">
+                    <div class="char-placeholder">${firstChar}</div>
+                    ${ok !== '0' ? `
+                    <img class="favicon-img ${domain.includes('github.com') ? 'github-invert' : ''}"
+                         src="${appleIcon}"
+                         onerror="this.src='${googleIcon}'"
+                         onload="checkFavicon(this, '${domain}')">` : ''}
+                </div>
+                <span class="label">${item.name}</span>
+            </a>`;
+        }
+        grid.appendChild(wrapper);
     });
+    lucide.createIcons();
 }
 
-window.onload=init;
+function goBack() {
+    currentFolderStack.pop();
+    renderGrid(
+        currentFolderStack.length
+            ? currentFolderStack[currentFolderStack.length - 1].children
+            : bookmarkData
+    );
+}
+
+window.onload = init;
 </script>
 </body>
 </html>
