@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CH Favorites</title>
-<script src="https://unpkg.com/lucide@latest"></script>
 
 <style>
 :root {
@@ -54,15 +53,16 @@ h1 {
     background: var(--tile);
     border-radius: 16px;
     border: 1px solid var(--border);
-    overflow: hidden;               /* ⭐ 라운드 마스크 통일 */
+    overflow: hidden;
     position: relative;
 }
 
 .favicon-img {
     width: 100%;
     height: 100%;
-    object-fit: cover;              /* ⭐ 선명 */
-    display: block;
+    object-fit: contain;          /* ⭐ 선명도 핵심 */
+    image-rendering: crisp-edges;
+    background: var(--tile);
 }
 
 .char-placeholder {
@@ -94,17 +94,9 @@ h1 {
 <div id="bookmarkGrid"></div>
 
 <script>
-let bookmarkData = [];
-
-function getRootDomain(hostname) {
-    const parts = hostname.replace(/^www\./, '').split('.');
-    return parts.length > 2
-        ? parts.slice(-2).join('.')
-        : parts.join('.');
-}
-
-function cacheKey(domain) {
-    return `favicon-cache:${domain}`;
+function getRootDomain(host) {
+    const p = host.replace(/^www\./, '').split('.');
+    return p.length > 2 ? p.slice(-2).join('.') : p.join('.');
 }
 
 async function init() {
@@ -113,8 +105,8 @@ async function init() {
     const doc = new DOMParser().parseFromString(text, 'text/html');
     const qa = [...doc.querySelectorAll('h3, dt')]
         .find(el => el.textContent.includes('Quick Access'));
-    bookmarkData = parseDL(qa.closest('dt').querySelector('dl'));
-    render(bookmarkData);
+    const list = parseDL(qa.closest('dt').querySelector('dl'));
+    render(list);
 }
 
 function parseDL(dl) {
@@ -137,58 +129,51 @@ function render(list) {
     grid.innerHTML = '';
 
     list.forEach(item => {
-        const url = new URL(item.url);
-        const root = getRootDomain(url.hostname);
-        const firstChar = root[0].toUpperCase();
+        const root = getRootDomain(new URL(item.url).hostname);
+        const first = root[0].toUpperCase();
 
-        const cached = localStorage.getItem(cacheKey(root));
-
-        const sources = cached ? [cached] : [
+        const sources = [
             item.icon,
             `https://${root}/favicon.ico`,
-            `https://${root}/apple-touch-icon.png`,
-            `https://www.google.com/s2/favicons?domain=${root}&sz=128`
+            `https://${root}/apple-touch-icon.png`
         ].filter(Boolean);
 
         const el = document.createElement('a');
         el.className = 'item';
         el.href = item.url;
 
-        const iconBox = document.createElement('div');
-        iconBox.className = 'icon-box';
+        const box = document.createElement('div');
+        box.className = 'icon-box';
 
         const fallback = document.createElement('div');
         fallback.className = 'char-placeholder';
-        fallback.textContent = firstChar;
-        iconBox.appendChild(fallback);
+        fallback.textContent = first;
+        box.appendChild(fallback);
 
         const img = document.createElement('img');
         img.className = 'favicon-img';
 
-        let index = 0;
+        let i = 0;
         img.onload = () => {
-            fallback.remove();                         // ⭐ 겹침 제거
-            localStorage.setItem(cacheKey(root), img.src);
+            if (img.naturalWidth < 24) return img.remove();
+            fallback.remove();
         };
         img.onerror = () => {
-            index++;
-            if (index < sources.length) {
-                img.src = sources[index];
-            } else {
-                img.remove();
-            }
+            i++;
+            if (i < sources.length) img.src = sources[i];
+            else img.remove();
         };
-        img.src = sources[index];
 
-        iconBox.appendChild(img);
+        img.src = sources[i];
+        box.appendChild(img);
 
-        el.appendChild(iconBox);
+        el.appendChild(box);
 
         const label = document.createElement('div');
         label.className = 'label';
         label.textContent = item.name;
-
         el.appendChild(label);
+
         grid.appendChild(el);
     });
 }
