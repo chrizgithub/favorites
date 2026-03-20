@@ -214,11 +214,9 @@ function parseDL(dl) {
                 children: parseDL(dt.querySelector('dl'))
             });
         } else if (a) {
-            data.push({
-                type: 'link',
-                name: a.textContent.trim(),
-                url: a.href
-            });
+            const name = a.textContent.trim();
+            if (['즐겨찾기', '플레이리스트'].includes(name)) return;
+            data.push({ type: 'link', name, url: a.href });
         }
     });
     return data;
