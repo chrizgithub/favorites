@@ -8,10 +8,9 @@
     <style>
         :root {
             --bg-color: #000000;
-            --tile-bg: #111111; /* 폰 아이콘 배경색 */
+            --tile-bg: #1a1a1a;
             --title-color: #FFD700;
-            --text-dim: #888888;
-            --icon-size: 60px; /* 폰 아이콘 크기 고정 */
+            --text-dim: #999999;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -19,7 +18,7 @@
         body {
             background-color: var(--bg-color);
             color: #ffffff;
-            font-family: "Pretendard", "Apple SD Gothic Neo", sans-serif;
+            font-family: -apple-system, sans-serif;
             padding: 40px 20px;
             display: flex;
             flex-direction: column;
@@ -31,19 +30,17 @@
             font-size: 1.6rem;
             font-weight: 800;
             width: 100%;
-            max-width: 360px;
-            margin-bottom: 35px;
+            max-width: 380px;
+            margin-bottom: 30px;
             text-align: left;
-            padding-left: 5px;
         }
 
-        /* 가로 4개 그리드 설정 */
         #bookmarkGrid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr); 
-            gap: 15px; /* 간격 축소 */
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
             width: 100%;
-            max-width: 360px; /* 모바일에 맞게 제한 */
+            max-width: 380px;
         }
 
         .item {
@@ -54,40 +51,31 @@
             color: inherit;
         }
 
-        /* 폰 아이콘 박스 크기 최적화 */
         .icon-box {
-            width: var(--icon-size);
-            height: var(--icon-size);
+            width: 65px;
+            height: 65px;
             background-color: var(--tile-bg);
-            border-radius: 15px; /* 폰 아이콘 모서리 곡률 */
+            border-radius: 16px;
             display: flex;
             justify-content: center;
             align-items: center;
             margin-bottom: 8px;
-            overflow: hidden; /* 이미지 넘침 방지 */
-            transition: transform 0.1s, background-color 0.2s;
+            overflow: hidden;
+            transition: transform 0.1s;
         }
 
-        /* 파비콘 이미지 스타일 */
+        .item:active .icon-box { transform: scale(0.9); }
+
+        /* 파비콘 스타일 */
         .favicon-img {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* 이미지를 박스에 꽉 채움 */
-            display: block;
+            object-fit: cover;
+            padding: 12px; /* 아이콘이 너무 꽉 차지 않게 여백 */
         }
 
-        /* 이미지 오류 시 보여줄 백업 아이콘 스타일 */
-        .backup-icon {
-            width: 24px;
-            height: 24px;
-            stroke-width: 1.5px;
-            color: #efefef;
-        }
-
-        .item:active .icon-box {
-            transform: scale(0.9);
-            background-color: #222;
-        }
+        /* 이미지가 없는 경우 보일 기본 아이콘 */
+        .backup-icon { color: #555; width: 24px; height: 24px; }
 
         .label {
             font-size: 10px;
@@ -97,94 +85,91 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            font-weight: 400;
         }
-
-        .loading { color: var(--text-dim); font-size: 0.9rem; margin-top: 50px; }
     </style>
 </head>
 <body>
 
     <h1>CH Favorites</h1>
-
-    <div id="bookmarkGrid">
-        </div>
-
-    <div id="status" class="loading">불러오는 중...</div>
+    <div id="bookmarkGrid"></div>
+    <div id="status" style="color:#555; margin-top:20px;"></div>
 
     <script>
-        const FILE_NAME = 'quetta-bookmarks.html';
-
-        async function init() {
+        async function loadBookmarks() {
             const grid = document.getElementById('bookmarkGrid');
             const status = document.getElementById('status');
 
             try {
-                const response = await fetch(FILE_NAME);
-                if (!response.ok) throw new Error();
+                const response = await fetch('quetta-bookmarks.html');
+                if (!response.ok) throw new Error("파일 로드 실패");
 
                 const text = await response.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(text, 'text/html');
 
-                // Quick Access 섹션 파싱 로직
-                const allHeadings = Array.from(doc.querySelectorAll('h1, h2, h3, h4, dt'));
-                const target = allHeadings.find(el => el.textContent.includes('Quick Access'));
+                // 1. "Quick Access" 텍스트를 포함한 헤더 찾기
+                const headers = Array.from(doc.querySelectorAll('h3, h2, h1, dt'));
+                const qaHeader = headers.find(h => h.textContent.trim().includes('Quick Access'));
 
-                if (!target) {
-                    status.textContent = "Quick Access 폴더를 찾을 수 없습니다.";
+                if (!qaHeader) {
+                    status.textContent = "Quick Access 섹션을 찾을 수 없습니다.";
                     return;
                 }
 
-                // 폴더 구조에 따라 다음 형제나 부모 내부에서 A 태그 검색
-                const container = target.tagName === 'DT' ? target.nextElementSibling : target.nextElementSibling;
-                const links = (container || target.parentElement).querySelectorAll('a');
+                // 2. 해당 헤더 바로 다음에 오는 링크 컨테이너(DL)에서 <a>만 모두 추출
+                // 보통 구조: <DT><H3>Quick Access</H3><DL>...</DL></DT>
+                let links = [];
+                let nextEl = qaHeader.nextElementSibling;
+                
+                // 만약 바로 다음 요소가 없으면 부모로 올라가서 찾음 (브라우저마다 파싱 구조가 다름)
+                if (!nextEl || nextEl.tagName !== 'DL') {
+                    nextEl = qaHeader.parentElement.querySelector('dl');
+                }
+
+                if (nextEl) {
+                    links = Array.from(nextEl.querySelectorAll('a'));
+                } else {
+                    // 최후의 수단: 헤더 이후의 모든 링크 중 다음 헤더가 나오기 전까지 추출
+                    let sibling = qaHeader.nextElementSibling;
+                    while (sibling && !['H1','H2','H3'].includes(sibling.tagName)) {
+                        const foundLinks = sibling.querySelectorAll('a');
+                        foundLinks.forEach(l => links.push(l));
+                        sibling = sibling.nextElementSibling;
+                    }
+                }
 
                 if (links.length === 0) {
-                    status.textContent = "링크가 없습니다.";
+                    status.textContent = "Quick Access 폴더가 비어있습니다.";
                     return;
                 }
-
-                status.style.display = 'none';
 
                 links.forEach(link => {
                     const name = link.textContent.trim();
                     const url = link.href;
+                    // 고해상도 파비콘 서비스 이용 (128px)
+                    const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`;
 
-                    // 파비콘 URL 가져오기 (1순위: HTML 속성, 2순위: Google API)
-                    let faviconUrl = link.getAttribute('ICON'); // Netscape 표준 북마크 형식에서 추출
-                    if (!faviconUrl || faviconUrl.startsWith('data:')) {
-                        // 만약 ICON 속성이 없거나 data URI라면 Google의 파비콘 캐시 API 사용
-                        faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`;
-                    }
-                    
-                    const anchor = document.createElement('a');
-                    anchor.href = url;
-                    anchor.className = 'item';
-                    anchor.target = "_blank"; // 새 탭에서 열기
-                    anchor.innerHTML = `
+                    const item = document.createElement('a');
+                    item.href = url;
+                    item.className = 'item';
+                    item.innerHTML = `
                         <div class="icon-box">
-                            <img class="favicon-img" src="${faviconUrl}" alt="${name}" onerror="handleImageError(this)">
+                            <img class="favicon-img" src="${faviconUrl}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                            <div class="backup-icon" style="display:none;"><i data-lucide="link"></i></div>
                         </div>
                         <span class="label">${name}</span>
                     `;
-                    grid.appendChild(anchor);
+                    grid.appendChild(item);
                 });
 
                 lucide.createIcons();
 
-            } catch (e) {
-                status.textContent = "파일을 읽을 수 없습니다. (서버 실행 확인)";
+            } catch (err) {
+                status.textContent = "에러: quetta-bookmarks.html 파일이나 서버 상태를 확인하세요.";
             }
         }
 
-        // 이미지 로딩 실패 시 루사이드 아이콘으로 대체하는 함수
-        function handleImageError(img) {
-            img.parentElement.innerHTML = '<i data-lucide="link-2" class="backup-icon"></i>';
-            lucide.createIcons();
-        }
-
-        window.onload = init;
+        window.onload = loadBookmarks;
     </script>
 </body>
 </html>
