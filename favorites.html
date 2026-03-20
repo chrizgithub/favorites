@@ -15,7 +15,7 @@
     --text-dim: #9a9a9a;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
     background: var(--bg);
@@ -54,29 +54,26 @@ h1 {
     background: var(--tile);
     border-radius: 16px;
     border: 1px solid var(--border);
+    overflow: hidden;               /* ⭐ 라운드 마스크 통일 */
     position: relative;
-    overflow: hidden;
 }
 
 .favicon-img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    background: var(--tile); /* 투명 방지 */
+    object-fit: cover;              /* ⭐ 선명 */
+    display: block;
 }
 
 .char-placeholder {
     width: 100%;
     height: 100%;
+    background: var(--tile);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 22px;
     font-weight: 800;
-    background: var(--tile);
 }
 
 .label {
@@ -98,6 +95,17 @@ h1 {
 
 <script>
 let bookmarkData = [];
+
+function getRootDomain(hostname) {
+    const parts = hostname.replace(/^www\./, '').split('.');
+    return parts.length > 2
+        ? parts.slice(-2).join('.')
+        : parts.join('.');
+}
+
+function cacheKey(domain) {
+    return `favicon-cache:${domain}`;
+}
 
 async function init() {
     const res = await fetch('quetta-bookmarks.html');
@@ -129,30 +137,58 @@ function render(list) {
     grid.innerHTML = '';
 
     list.forEach(item => {
-        const domain = new URL(item.url).hostname.replace('www.', '');
-        const first = domain[0].toUpperCase();
+        const url = new URL(item.url);
+        const root = getRootDomain(url.hostname);
+        const firstChar = root[0].toUpperCase();
 
-        const iconSrc =
-            item.icon ||
-            `https://${domain}/apple-touch-icon.png`;
+        const cached = localStorage.getItem(cacheKey(root));
 
-        const googleFallback =
-            `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+        const sources = cached ? [cached] : [
+            item.icon,
+            `https://${root}/favicon.ico`,
+            `https://${root}/apple-touch-icon.png`,
+            `https://www.google.com/s2/favicons?domain=${root}&sz=128`
+        ].filter(Boolean);
 
         const el = document.createElement('a');
         el.className = 'item';
         el.href = item.url;
 
-        el.innerHTML = `
-        <div class="icon-box">
-            <div class="char-placeholder">${first}</div>
-            <img class="favicon-img"
-                 src="${iconSrc}"
-                 onerror="this.onerror=null; this.src='${googleFallback}'"
-                 onload="this.previousElementSibling.remove()">
-        </div>
-        <div class="label">${item.name}</div>
-        `;
+        const iconBox = document.createElement('div');
+        iconBox.className = 'icon-box';
+
+        const fallback = document.createElement('div');
+        fallback.className = 'char-placeholder';
+        fallback.textContent = firstChar;
+        iconBox.appendChild(fallback);
+
+        const img = document.createElement('img');
+        img.className = 'favicon-img';
+
+        let index = 0;
+        img.onload = () => {
+            fallback.remove();                         // ⭐ 겹침 제거
+            localStorage.setItem(cacheKey(root), img.src);
+        };
+        img.onerror = () => {
+            index++;
+            if (index < sources.length) {
+                img.src = sources[index];
+            } else {
+                img.remove();
+            }
+        };
+        img.src = sources[index];
+
+        iconBox.appendChild(img);
+
+        el.appendChild(iconBox);
+
+        const label = document.createElement('div');
+        label.className = 'label';
+        label.textContent = item.name;
+
+        el.appendChild(label);
         grid.appendChild(el);
     });
 }
