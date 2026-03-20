@@ -7,11 +7,12 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
-            --bg-color: #000000;
-            --tile-bg: #1a1a1a; /* 앱 아이콘 배경색 */
-            --title-color: #ffffff; /* 제목은 흰색 고딕 */
+            /* 5. 배경색 변경: 아주 어두운 회색 */
+            --bg-color: #121212; 
+            --tile-bg: #1e1e1e; /* 아이콘 박스 배경색 */
+            --title-color: #ffffff; 
             --text-dim: #999999;
-            --folder-color: #ffffff; /* 폴더 아이콘 색상 */
+            --folder-color: #ffffff;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -28,17 +29,17 @@
 
         h1 {
             color: var(--title-color);
-            font-size: 1.6rem;
+            font-size: 1.5rem;
             font-weight: 800;
             width: 100%;
-            max-width: 360px;
+            max-width: 340px;
             margin-bottom: 25px;
             padding-left: 5px;
         }
 
         .back-bar {
             width: 100%;
-            max-width: 360px;
+            max-width: 340px;
             text-align: left;
             padding: 10px 10px 20px 10px;
             display: none;
@@ -59,9 +60,9 @@
         #bookmarkGrid {
             display: grid;
             grid-template-columns: repeat(4, 1fr); 
-            gap: 15px 10px;
+            gap: 12px 8px; /* 간격 축소 */
             width: 100%;
-            max-width: 360px;
+            max-width: 340px; /* 전체 너비 축소 */
             margin-top: 20px;
         }
 
@@ -80,44 +81,58 @@
 
         .icon-box {
             width: 100%;
-            max-width: 65px;
+            /* 1. 아이콘 크기 약 10% 축소: max-width 조정 */
+            max-width: 58px; 
             aspect-ratio: 1 / 1;
             background-color: var(--tile-bg);
-            border-radius: 18px; /* 보내주신 이미지의 둥글기 */
+            border-radius: 16px; /* 둥글기 살짝 조정 */
             display: flex;
             justify-content: center;
             align-items: center;
-            overflow: hidden; /* 이미지 넘침 방지 */
-            border: 1px solid #222;
+            overflow: hidden;
+            border: 1px solid #2a2a2a;
             transition: transform 0.1s;
         }
 
-        .item:active .icon-box { transform: scale(0.9); }
+        .item:active .icon-box { transform: scale(0.92); }
 
         .favicon-img {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* 이미지를 박스에 꽉 채움 */
-            /* padding 제거: 이미지를 꽉 차게 보여주기 위함 */
+            object-fit: cover;
+            image-rendering: -webkit-optimize-contrast; /* 2. 선명도 향상 CSS */
+            image-rendering: crisp-edges;
         }
         
-        .folder-icon { color: var(--folder-color); width: 28px; height: 28px; }
-        .backup-icon { color: #444; width: 24px; height: 24px; }
+        /* Github 등 검은색 아이콘 반전 (4번 해결) */
+        .invert-icon {
+            filter: invert(1) brightness(2); /* 흰색으로 반전 후 밝기 조정 */
+        }
+
+        /* 3. 알파벳 대체 아이콘 스타일 */
+        .char-icon {
+            font-size: 24px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.8);
+            text-transform: uppercase;
+        }
+
+        .folder-icon { color: var(--folder-color); width: 26px; height: 26px; }
 
         .label {
             font-size: 10px;
             color: var(--text-dim);
             text-align: center;
             width: 100%;
-            margin-top: 8px;
+            margin-top: 7px;
             display: block;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            padding: 0 4px;
+            padding: 0 3px;
         }
 
-        .loading-status { color: #444; margin-top: 50px; font-size: 12px; }
+        .loading-status { color: #555; margin-top: 50px; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -182,6 +197,7 @@
                 if (h3 && nextDL) {
                     data.push({ type: 'folder', name: h3.textContent.trim(), children: parseDL(nextDL) });
                 } else if (a) {
+                    // [2. 선명도 향상] 북마크 파일 내부의 ICON 속성(고해상도 데이터 URL) 우선 추출
                     data.push({ type: 'link', name: a.textContent.trim(), url: a.href, icon: a.getAttribute('ICON') });
                 }
             });
@@ -221,13 +237,20 @@
                     };
                 } else {
                     const domain = new URL(item.url).hostname;
-                    // 선명한 고해상도 DuckDuckGo 파비콘 API 최우선 사용
-                    let faviconUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+                    // [2 & 3. 선명도 & 대체] 3중 안전장치 파비콘 로직
+                    // 1순위: 북마크 파일 내부 ICON 데이터 (고해상도)
+                    // 2순위: DuckDuckGo 고해상도 API
+                    // 3순위: 알파벳 대체 아이콘
+                    let faviconUrl = item.icon || `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+                    
+                    // [4. Github 검은색 아이콘 해결] 특정 도메인 아이콘 반전 처리
+                    let imgClass = "favicon-img";
+                    if (domain.includes('github.com')) imgClass += " invert-icon";
 
                     el.innerHTML = `
                         <a href="${item.url}" target="_self" class="item" style="margin-bottom:0">
                             <div class="icon-box">
-                                <img class="favicon-img" src="${faviconUrl}" onerror="handleFaviconError(this, '${domain}')">
+                                <img class="${imgClass}" src="${faviconUrl}" onerror="handleFaviconError(this, '${domain}')">
                             </div>
                             <span class="label">${item.name}</span>
                         </a>
@@ -238,22 +261,24 @@
             lucide.createIcons();
         }
 
-        // Favicon 로드 실패 시 대체 로직
+        // Favicon 로드 실패 시 대체 로직 (최종 안전장치)
         function handleFaviconError(img, domain) {
+            if (img.src.includes('quetta-bookmarks.html') || img.complete) return; // 이미 ICON 데이터로 로드된 경우 패스
+
             if (img.src.includes('duckduckgo')) {
-                // 1차 실패 시 구글 고해상도 API로 2차 시도
+                // DuckDuckGo 실패 시 구글 고해상도 API로 2차 시도
                 img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
             } else if (img.src.includes('sz=128')) {
-                // 2차 실패 시 구글 일반 API로 3차 시도
+                // 구글 고해상도 실패 시 구글 일반 API로 3차 시도
                 img.src = `https://www.google.com/s2/favicons?domain=${domain}`;
             } else {
-                // 최종 실패 시 기본 링크 아이콘으로 대체
+                // [3. 알파벳 대체 아이콘] 모든 이미지 로드 실패 시 도메인의 첫 글자 표시
                 img.style.display = 'none';
-                const backupDiv = document.createElement('div');
-                backupDiv.className = 'backup-icon';
-                backupDiv.innerHTML = '<i data-lucide="link"></i>';
-                img.parentElement.appendChild(backupDiv);
-                lucide.createIcons();
+                const char = domain.charAt(0).toUpperCase();
+                const charDiv = document.createElement('div');
+                charDiv.className = 'char-icon';
+                charDiv.textContent = char;
+                img.parentElement.appendChild(charDiv);
             }
         }
 
