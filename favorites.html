@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CH Favorites</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --tile-bg: #151515;
+            --title-color: #FFD700;
+            --text-dim: #999999;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background-color: var(--bg-color);
+            color: #ffffff;
+            font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: var(--title-color);
+            font-size: 1.5rem;
+            font-weight: 800;
+            width: 100%;
+            max-width: 400px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        /* 4열 그리드 */
+        #bookmarkGrid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: inherit;
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        .icon-box {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background-color: var(--tile-bg);
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 8px;
+            transition: transform 0.1s;
+        }
+
+        .item:active .icon-box { transform: scale(0.92); background-color: #252525; }
+
+        .label {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-align: center;
+            width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .status-msg { color: var(--text-dim); font-size: 0.8rem; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <h1>CH Favorites</h1>
+
+    <div id="bookmarkGrid">
+        </div>
+
+    <div id="status" class="status-msg">데이터를 불러오는 중...</div>
+
+    <script>
+        // 1. 설정: 읽어올 파일명 (와일드카드는 지원 안 되므로 정확한 파일명 기재 필요)
+        const TARGET_FILE = 'quetta-bookmarks.html'; 
+
+        async function loadBookmarks() {
+            const grid = document.getElementById('bookmarkGrid');
+            const status = document.getElementById('status');
+
+            try {
+                const response = await fetch(TARGET_FILE);
+                if (!response.ok) throw new Error('파일을 찾을 수 없습니다.');
+                
+                const htmlText = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, 'text/html');
+
+                // 2. Quick Access 섹션 찾기
+                // 보통 북마크 파일은 h3나 h2에 폴더명이 있고, 그 다음 dl/ul에 링크가 있습니다.
+                const headers = Array.from(doc.querySelectorAll('h1, h2, h3, h4'));
+                const quickAccessHeader = headers.find(h => h.textContent.includes('Quick Access'));
+
+                if (!quickAccessHeader) {
+                    status.textContent = "'Quick Access' 섹션을 찾지 못했습니다.";
+                    return;
+                }
+
+                // 해당 헤더 이후에 나오는 모든 <a> 태그 파싱 (다음 형제 요소인 DL 또는 UL 내에서)
+                const container = quickAccessHeader.nextElementSibling;
+                const links = container.querySelectorAll('a');
+
+                if (links.length === 0) {
+                    status.textContent = "링크가 없습니다.";
+                    return;
+                }
+
+                status.style.display = 'none';
+
+                links.forEach(link => {
+                    const name = link.textContent;
+                    const url = link.href;
+                    
+                    const item = document.createElement('a');
+                    item.href = url;
+                    item.className = 'item';
+                    item.innerHTML = `
+                        <div class="icon-box"><i data-lucide="link"></i></div>
+                        <span class="label">${name}</span>
+                    `;
+                    grid.appendChild(item);
+                });
+
+                // 아이콘 렌더링
+                lucide.createIcons();
+
+            } catch (error) {
+                status.textContent = "오류: quetta-bookmarks.html 파일을 확인해주세요.";
+                console.error(error);
+            }
+        }
+
+        window.onload = loadBookmarks;
+    </script>
+</body>
+</html>
