@@ -9,18 +9,29 @@
         :root {
             --bg-color: #121212; 
             --tile-bg: #1e1e1e;
+            /* 2. 제목 색상: 흐린 노란색 */
+            --title-color: #ffd740; 
             --text-dim: #999999;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg-color); color: #fff; font-family: -apple-system, sans-serif; padding: 30px 10px; display: flex; flex-direction: column; align-items: center; }
+        body { background-color: var(--bg-color); color: #fff; font-family: -apple-system, sans-serif; padding: 10px; display: flex; flex-direction: column; align-items: center; }
         
-        h1 { font-size: 1.5rem; font-weight: 800; width: 100%; max-width: 340px; margin-bottom: 25px; padding-left: 5px; color: #ffffff; }
+        h1 { 
+            color: var(--title-color); 
+            font-size: 1.4rem; 
+            font-weight: 800; 
+            width: 100%; 
+            max-width: 340px; 
+            /* 3. 여백 축소 */
+            margin-top: 10px; 
+            margin-bottom: 20px; 
+            padding-left: 5px; 
+        }
         
         .back-bar { width: 100%; max-width: 340px; margin-bottom: 20px; display: none; }
         .back-btn { background:none; border:none; color:#fff; cursor:pointer; display:flex; align-items:center; gap:4px; font-weight:600; font-size: 0.9rem; }
 
-        /* [그리드 복구] 무조건 4열 고정 */
         #bookmarkGrid { 
             display: grid; 
             grid-template-columns: repeat(4, 1fr); 
@@ -29,54 +40,34 @@
             max-width: 340px; 
         }
 
-        .item { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            text-decoration: none; 
-            color: inherit; 
-            width: 100%;
-            min-width: 0; /* 텍스트 생략용 */
-        }
+        .item { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: inherit; width: 100%; min-width: 0; }
         
-        /* [아이콘 박스] 크기 10% 축소 및 꽉 차게 설정 */
         .icon-box {
-            width: 100%; 
-            max-width: 58px; 
-            aspect-ratio: 1 / 1;
-            background-color: var(--tile-bg); 
-            border-radius: 16px;
+            width: 100%; max-width: 58px; aspect-ratio: 1 / 1;
+            background-color: var(--tile-bg); border-radius: 16px;
             display: flex; justify-content: center; align-items: center;
             overflow: hidden; border: 1px solid #2a2a2a; position: relative;
         }
 
-        /* [이미지 설정] 선명도 및 꽉 채우기 */
         .favicon-img {
             width: 100%; height: 100%; object-fit: cover;
             image-rendering: -webkit-optimize-contrast;
             position: absolute; top: 0; left: 0; z-index: 2;
         }
         
-        /* [GitHub 반전] 확실하게 하얀색으로 */
-        .github-invert { filter: invert(1) brightness(1.5) !important; }
+        /* Github 반전 */
+        .github-invert { filter: invert(1) brightness(2) !important; }
 
-        /* [알파벳 대체] 배경에 깔려있다가 이미지 실패 시 보임 */
+        /* [1. 지구본 차단] 알파벳 대체 아이콘 */
         .char-placeholder {
-            font-size: 24px; font-weight: 800; color: #555;
+            font-size: 24px; font-weight: 800; color: #ffffff;
             text-transform: uppercase; z-index: 1;
         }
 
-        /* [텍스트] 한 줄 생략 처리 */
         .label { 
-            font-size: 10px; 
-            color: var(--text-dim); 
-            text-align: center; 
-            width: 100%; 
-            margin-top: 7px; 
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-            padding: 0 4px;
+            font-size: 10px; color: var(--text-dim); text-align: center;
+            width: 100%; margin-top: 7px; white-space: nowrap; 
+            overflow: hidden; text-overflow: ellipsis; padding: 0 3px;
         }
 
         .folder-icon { color: #fff; width: 26px; height: 26px; }
@@ -99,7 +90,7 @@
                 const qa = Array.from(doc.querySelectorAll('h3, dt')).find(el => el.textContent.includes('Quick Access'));
                 bookmarkData = parseDL(qa.closest('dt').querySelector('dl'));
                 renderGrid(bookmarkData);
-            } catch (e) { document.body.innerHTML += "<p style='padding:20px; color:gray;'>파일을 찾을 수 없습니다.</p>"; }
+            } catch (e) { document.body.innerHTML += "<p style='padding:20px; color:gray;'>파일 로딩 실패</p>"; }
         }
 
         function parseDL(dl) {
@@ -115,9 +106,10 @@
 
         function renderGrid(list) {
             const grid = document.getElementById('bookmarkGrid');
+            const backBar = document.getElementById('backBar');
             grid.innerHTML = '';
-            document.getElementById('backBar').style.display = currentFolderStack.length ? 'block' : 'none';
             window.scrollTo(0, 0);
+            backBar.style.display = currentFolderStack.length ? 'block' : 'none';
 
             list.forEach(item => {
                 const div = document.createElement('div');
@@ -127,12 +119,13 @@
                     div.onclick = () => { currentFolderStack.push(item); renderGrid(item.children); };
                 } else {
                     const domain = new URL(item.url).hostname;
-                    const char = domain.replace('www.', '').charAt(0).toUpperCase();
-                    // 선명도를 위해 구글 API 128px 고화질 모드 사용
+                    const cleanDomain = domain.replace('www.', '');
+                    const char = cleanDomain.charAt(0).toUpperCase();
+                    // 구글 파비콘 API (128px 고해상도) 사용
                     const iconUrl = item.icon || `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
 
                     div.innerHTML = `
-                        <a href="${item.url}" class="item">
+                        <a href="${item.url}" target="_self" class="item">
                             <div class="icon-box">
                                 <span class="char-placeholder">${char}</span>
                                 <img class="favicon-img ${domain.includes('github.com') ? 'github-invert' : ''}" 
