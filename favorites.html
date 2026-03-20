@@ -4,14 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CH Favorites</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
             --bg-color: #000000;
             --tile-bg: #1a1a1a;
             --title-color: #FFD700;
             --text-dim: #999999;
-            /* 아이콘 크기를 모바일 4열에 맞춰 축소 */
-            --icon-box-size: 60px; 
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -20,7 +19,7 @@
             background-color: var(--bg-color);
             color: #ffffff;
             font-family: -apple-system, sans-serif;
-            padding: 30px 15px; /* 여백 조정 */
+            padding: 30px 10px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -31,19 +30,18 @@
             font-size: 1.5rem;
             font-weight: 800;
             width: 100%;
-            max-width: 360px; /* 전체 너비 제한 */
+            max-width: 360px;
             margin-bottom: 25px;
-            text-align: left;
-            padding-left: 5px;
+            padding-left: 10px;
         }
 
-        /* 가로 4개 그리드 최적화 */
+        /* 가로 4열 그리드 강제 고정 */
         #bookmarkGrid {
             display: grid;
             grid-template-columns: repeat(4, 1fr); 
-            gap: 12px; /* 간격 축소 */
+            gap: 10px;
             width: 100%;
-            max-width: 360px; /* 아이콘들이 퍼지지 않게 중앙 배치 */
+            max-width: 380px;
         }
 
         .item {
@@ -52,52 +50,42 @@
             align-items: center;
             text-decoration: none;
             color: inherit;
-            /* 텍스트가 길어져도 아이콘 박스 너비를 유지 */
-            width: 100%; 
+            width: 100%;
+            margin-bottom: 10px;
         }
 
         .icon-box {
-            width: var(--icon-box-size);
-            height: var(--icon-box-size);
+            width: 100%; /* 그리드 칸 너비에 맞춤 */
+            max-width: 70px;
+            aspect-ratio: 1 / 1;
             background-color: var(--tile-bg);
-            border-radius: 16px; /* 앱 아이콘 느낌 */
+            border-radius: 18px;
             display: flex;
             justify-content: center;
             align-items: center;
-            margin-bottom: 6px;
             overflow: hidden;
-            border: 1px solid #222;
+            border: 1px solid #252525;
             transition: transform 0.1s;
         }
 
         .item:active .icon-box { transform: scale(0.9); }
 
-        .favicon-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            /* 파비콘 여백 조정 (아이콘마다 다를 수 있음) */
-            padding: 10px; 
-        }
+        .favicon-img { width: 100%; height: 100%; object-fit: cover; padding: 15px; }
+        
+        /* 폴더 아이콘 스타일 */
+        .folder-icon { color: #FFD700; width: 32px; height: 32px; }
 
-        /* 핵심: 텍스트 한 줄 생략 처리 */
         .label {
             font-size: 10px;
             color: var(--text-dim);
             text-align: center;
             width: 100%;
-            padding: 0 2px;
-            /* 텍스트 생략 로직 */
-            white-space: nowrap;      /* 줄바꿈 금지 */
-            overflow: hidden;         /* 넘치는 부분 숨김 */
-            text-overflow: ellipsis;  /* 끝부분 '...' 처리 */
-            font-weight: 400;
-        }
-
-        .loading-status {
-            color: #444; 
-            margin-top: 40px; 
-            font-size: 12px;
+            margin-top: 6px;
+            padding: 0 4px;
+            /* 긴 텍스트 생략 처리 */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
     </style>
 </head>
@@ -105,7 +93,7 @@
 
     <h1>CH Favorites</h1>
     <div id="bookmarkGrid"></div>
-    <div id="status" class="loading-status"></div>
+    <div id="status" style="color:#444; margin-top:50px; font-size:12px;"></div>
 
     <script>
         async function init() {
@@ -113,68 +101,74 @@
             const status = document.getElementById('status');
 
             try {
-                // 1. 파일 읽기
-                status.textContent = "데이터 불러오는 중...";
                 const response = await fetch('quetta-bookmarks.html');
-                if (!response.ok) throw new Error("파일 로드 실패");
+                if (!response.ok) throw new Error();
                 
-                const rawHtml = await response.text();
+                const text = await response.text();
                 const parser = new DOMParser();
-                const doc = parser.parseFromString(rawHtml, 'text/html');
+                const doc = parser.parseFromString(text, 'text/html');
 
-                // 2. "Quick Access" 섹션 찾기
-                const allHeadings = Array.from(doc.querySelectorAll('h3, h2, h1, dt'));
-                const qaTarget = allHeadings.find(el => el.textContent.includes('Quick Access'));
+                // 1. Quick Access 찾기
+                const qaHeader = Array.from(doc.querySelectorAll('h3, h2, dt')).find(el => el.textContent.includes('Quick Access'));
+                if (!qaHeader) { status.textContent = "Quick Access를 찾을 수 없습니다."; return; }
 
-                if (!qaTarget) {
-                    status.textContent = "Quick Access 섹션을 찾지 못했습니다.";
-                    return;
-                }
+                // 2. Quick Access 하위의 DL 태그 찾기
+                const parentDT = qaHeader.closest('dt');
+                const subDL = parentDT.querySelector('dl');
+                
+                if (!subDL) { status.textContent = "하위 항목이 없습니다."; return; }
 
-                // 3. 해당 섹션 내부의 <a> 태그들 추출
-                // 표준 구조인 <DT><H3>Quick Access</H3><DL> 내부에서 찾음
-                const parentDT = qaTarget.closest('dt');
-                if (!parentDT) {
-                    status.textContent = "북마크 구조가 표준과 다릅니다.";
-                    return;
-                }
-                const links = parentDT.querySelectorAll('a');
+                // 3. 하위 요소들을 순회하며 폴더와 링크 구분
+                // DL의 자식인 DT들을 가져옴
+                const items = subDL.querySelectorAll(':scope > dt');
 
-                if (links.length === 0) {
-                    status.textContent = "표시할 링크가 없습니다.";
-                    return;
-                }
+                items.forEach(dt => {
+                    const folderTitle = dt.querySelector('h3');
+                    const link = dt.querySelector('a');
 
-                // 4. 그리드 생성
-                links.forEach(link => {
-                    const name = link.textContent.trim();
-                    const url = link.href;
-                    if (!url || url.startsWith('javascript:')) return;
-
-                    // 구글 파비콘 API (고해상도 128px 요청)
-                    const domain = new URL(url).hostname;
-                    const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-
-                    const anchor = document.createElement('a');
-                    anchor.href = url;
-                    anchor.className = 'item';
-                    anchor.target = "_blank"; // 새 탭에서 열기
-                    anchor.innerHTML = `
-                        <div class="icon-box">
-                            <img class="favicon-img" src="${faviconUrl}" alt="" 
-                                 onerror="this.src='https://www.google.com/s2/favicons?domain=${domain}&sz=64'; this.onerror=null; ">
-                        </div>
-                        <span class="label">${name}</span>
-                    `;
-                    grid.appendChild(anchor);
+                    if (folderTitle) {
+                        // [서브 폴더인 경우]
+                        createItem(folderTitle.textContent, "#", true);
+                    } else if (link) {
+                        // [일반 링크인 경우]
+                        createItem(link.textContent, link.href, false);
+                    }
                 });
 
-                status.style.display = 'none'; // 로딩 메시지 숨김
+                lucide.createIcons();
+                status.style.display = 'none';
 
             } catch (err) {
-                status.textContent = "서버 오류: quetta-bookmarks.html 파일 확인이 필요합니다.";
-                console.error(err);
+                status.textContent = "파일을 불러올 수 없습니다.";
             }
+        }
+
+        function createItem(name, url, isFolder) {
+            const grid = document.getElementById('bookmarkGrid');
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.className = 'item';
+            if (!isFolder) anchor.target = "_blank";
+
+            let iconContent;
+            if (isFolder) {
+                // 폴더 아이콘
+                iconContent = `<div class="icon-box"><i data-lucide="folder" class="folder-icon"></i></div>`;
+            } else {
+                // 사이트 파비콘
+                const domain = new URL(url).hostname;
+                const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+                iconContent = `
+                    <div class="icon-box">
+                        <img class="favicon-img" src="${faviconUrl}" onerror="this.src='https://www.google.com/s2/favicons?domain=${domain}&sz=64'; this.onerror=null;">
+                    </div>`;
+            }
+
+            anchor.innerHTML = `
+                ${iconContent}
+                <span class="label">${name}</span>
+            `;
+            grid.appendChild(anchor);
         }
 
         window.onload = init;
