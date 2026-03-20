@@ -35,7 +35,6 @@
             padding-left: 10px;
         }
 
-        /* 뒤로 가기 버튼 바 */
         .back-bar {
             width: 100%;
             max-width: 380px;
@@ -65,7 +64,6 @@
             margin-top: 20px;
         }
 
-        /* 최상위일 때 margin 조정 */
         h1 + #bookmarkGrid { margin-top: 30px; }
 
         .item {
@@ -96,7 +94,8 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            padding: 12px;
+            /* 고해상도 이미지를 위해 여백 최소화 */
+            padding: 6px; 
         }
         
         .folder-icon { color: #FFD700; width: 30px; height: 30px; }
@@ -160,7 +159,6 @@
             document.getElementById('backBtn').onclick = function() {
                 if (currentFolderStack.length > 0) {
                     currentFolderStack.pop(); // 현재 폴더를 스택에서 제거
-                    // 부모 폴더 목록으로 다시 그리기 (스택이 비면 최상위 데이터 사용)
                     const prevData = currentFolderStack.length > 0 ? currentFolderStack[currentFolderStack.length - 1].children : bookmarkData;
                     renderGrid(prevData); 
                 }
@@ -179,7 +177,6 @@
                 if (h3 && nextDL) {
                     data.push({ type: 'folder', name: h3.textContent.trim(), children: parseDL(nextDL) });
                 } else if (a) {
-                    // 북마크 파일 내부에 ICON 속성이 있다면 저장
                     data.push({ type: 'link', name: a.textContent.trim(), url: a.href, icon: a.getAttribute('ICON') });
                 }
             });
@@ -189,15 +186,18 @@
         function renderGrid(dataList) {
             const grid = document.getElementById('bookmarkGrid');
             const backBar = document.getElementById('backBar');
-            grid.innerHTML = '';
+            grid.innerHTML = ''; // 기존 목록 초기화
+
+            // [핵심] 폴더 전환 시 화면 맨 위로 스크롤
+            window.scrollTo({ top: 0, behavior: 'instant' }); 
 
             // 뒤로 가기 바 표시 여부 결정
             if (currentFolderStack.length > 0) {
                 backBar.style.display = 'block';
-                grid.style.marginTop = '0'; // 뒤로 가기 바가 있을 때 여백 축소
+                grid.style.marginTop = '0';
             } else {
                 backBar.style.display = 'none';
-                grid.style.marginTop = '20px'; // 최상위일 때 여백 확보
+                grid.style.marginTop = '20px';
             }
 
             dataList.forEach(item => {
@@ -214,15 +214,14 @@
                         renderGrid(item.children); // 자식 목록 그리기
                     };
                 } else {
-                    // 1순위: 파일 내부 ICON 속성 (데이터 URL), 2순위: 구글 파비콘 API
                     const domain = new URL(item.url).hostname;
-                    let faviconUrl = item.icon || `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+                    // [핵심] DuckDuckGo 파비콘 API (128px 고해상도) 최우선 사용
+                    let faviconUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
 
                     el.innerHTML = `
                         <a href="${item.url}" target="_self" class="item" style="margin-bottom:0">
                             <div class="icon-box">
-                                <img class="favicon-img" src="${faviconUrl}" 
-                                     onerror="handleFaviconError(this, '${domain}')">
+                                <img class="favicon-img" src="${faviconUrl}" onerror="handleFaviconError(this, '${domain}')">
                             </div>
                             <span class="label">${item.name}</span>
                         </a>
@@ -235,9 +234,12 @@
 
         // Favicon 로드 실패 시 대체 로직
         function handleFaviconError(img, domain) {
-            if (img.src.includes('sz=128')) {
-                // 64px 크기로 2차 시도
-                img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+            if (img.src.includes('duckduckgo')) {
+                // 1차 실패 시 구글 고해상도 API로 2차 시도
+                img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+            } else if (img.src.includes('sz=128')) {
+                // 2차 실패 시 구글 일반 API로 3차 시도
+                img.src = `https://www.google.com/s2/favicons?domain=${domain}`;
             } else {
                 // 최종 실패 시 기본 링크 아이콘으로 대체
                 img.style.display = 'none';
