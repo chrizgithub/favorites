@@ -1,150 +1,272 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CH Favorites</title>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        :root {
-            --bg-color: #121212; 
-            --tile-bg: #1e1e1e;
-            /* 2. 제목 색상: 흐린 노란색 */
-            --title-color: #ffd740; 
-            --text-dim: #999999;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CH Favorites</title>
 
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg-color); color: #fff; font-family: -apple-system, sans-serif; padding: 10px; display: flex; flex-direction: column; align-items: center; }
-        
-        h1 { 
-            color: var(--title-color); 
-            font-size: 1.4rem; 
-            font-weight: 800; 
-            width: 100%; 
-            max-width: 340px; 
-            /* 3. 여백 축소 */
-            margin-top: 10px; 
-            margin-bottom: 20px; 
-            padding-left: 5px; 
-        }
-        
-        .back-bar { width: 100%; max-width: 340px; margin-bottom: 20px; display: none; }
-        .back-btn { background:none; border:none; color:#fff; cursor:pointer; display:flex; align-items:center; gap:4px; font-weight:600; font-size: 0.9rem; }
+<script src="https://unpkg.com/lucide@latest"></script>
 
-        #bookmarkGrid { 
-            display: grid; 
-            grid-template-columns: repeat(4, 1fr); 
-            gap: 15px 10px; 
-            width: 100%; 
-            max-width: 340px; 
-        }
+<style>
+:root {
+    --bg-color: #121212;
+    --tile-bg: #1e1e1e;
+    --title-color: #ffd740;
+    --text-dim: #999;
+}
 
-        .item { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: inherit; width: 100%; min-width: 0; }
-        
-        .icon-box {
-            width: 100%; max-width: 58px; aspect-ratio: 1 / 1;
-            background-color: var(--tile-bg); border-radius: 16px;
-            display: flex; justify-content: center; align-items: center;
-            overflow: hidden; border: 1px solid #2a2a2a; position: relative;
-        }
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
 
-        .favicon-img {
-            width: 100%; height: 100%; object-fit: cover;
-            image-rendering: -webkit-optimize-contrast;
-            position: absolute; top: 0; left: 0; z-index: 2;
-        }
-        
-        /* Github 반전 */
-        .github-invert { filter: invert(1) brightness(2) !important; }
+body {
+    background: var(--bg-color);
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
 
-        /* [1. 지구본 차단] 알파벳 대체 아이콘 */
-        .char-placeholder {
-            font-size: 24px; font-weight: 800; color: #ffffff;
-            text-transform: uppercase; z-index: 1;
-        }
+h1 {
+    color: var(--title-color);
+    font-size: 1.4rem;
+    font-weight: 800;
+    width: 100%;
+    max-width: 340px;
+    margin: 10px 0 20px;
+    padding-left: 5px;
+}
 
-        .label { 
-            font-size: 10px; color: var(--text-dim); text-align: center;
-            width: 100%; margin-top: 7px; white-space: nowrap; 
-            overflow: hidden; text-overflow: ellipsis; padding: 0 3px;
-        }
+.back-bar {
+    width: 100%;
+    max-width: 340px;
+    margin-bottom: 20px;
+    display: none;
+}
 
-        .folder-icon { color: #fff; width: 26px; height: 26px; }
-    </style>
+.back-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#bookmarkGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px 10px;
+    width: 100%;
+    max-width: 340px;
+}
+
+.item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    color: inherit;
+}
+
+.icon-box {
+    width: 58px;
+    height: 58px;
+    background: var(--tile-bg);
+    border-radius: 16px;
+    border: 1px solid #2a2a2a;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.favicon-img {
+    width: 70%;
+    height: 70%;
+    object-fit: contain;
+    position: absolute;
+    z-index: 2;
+}
+
+.github-invert {
+    filter: invert(1) brightness(2);
+}
+
+.char-placeholder {
+    width: 100%;
+    height: 100%;
+    font-size: 22px;
+    font-weight: 800;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-transform: uppercase;
+    z-index: 1;
+}
+
+.label {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 7px;
+    width: 100%;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.folder-icon {
+    width: 26px;
+    height: 26px;
+    color: #fff;
+}
+</style>
 </head>
+
 <body>
-    <h1>CH Favorites</h1>
-    <div class="back-bar" id="backBar"><button class="back-btn" onclick="goBack()"><i data-lucide="chevron-left" size="18"></i> 뒤로</button></div>
-    <div id="bookmarkGrid"></div>
+<h1>CH Favorites</h1>
 
-    <script>
-        let bookmarkData = [];
-        let currentFolderStack = [];
+<div class="back-bar" id="backBar">
+    <button class="back-btn" onclick="goBack()">
+        <i data-lucide="chevron-left" size="18"></i> 뒤로
+    </button>
+</div>
 
-        async function init() {
-            try {
-                const res = await fetch('quetta-bookmarks.html');
-                const text = await res.text();
-                const doc = new DOMParser().parseFromString(text, 'text/html');
-                const qa = Array.from(doc.querySelectorAll('h3, dt')).find(el => el.textContent.includes('Quick Access'));
-                bookmarkData = parseDL(qa.closest('dt').querySelector('dl'));
-                renderGrid(bookmarkData);
-            } catch (e) { document.body.innerHTML += "<p style='padding:20px; color:gray;'>파일 로딩 실패</p>"; }
-        }
+<div id="bookmarkGrid"></div>
 
-        function parseDL(dl) {
-            let data = [];
-            if (!dl) return data;
-            dl.querySelectorAll(':scope > dt').forEach(dt => {
-                const h3 = dt.querySelector(':scope > h3'), a = dt.querySelector(':scope > a');
-                if (h3) data.push({ type: 'folder', name: h3.textContent.trim(), children: parseDL(dt.querySelector('dl')) });
-                else if (a) data.push({ type: 'link', name: a.textContent.trim(), url: a.href, icon: a.getAttribute('ICON') });
+<script>
+let bookmarkData = [];
+let currentFolderStack = [];
+
+function hashColor(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 60%, 45%)`;
+}
+
+function faviconKey(domain) {
+    return `favicon-ok:${domain}`;
+}
+
+function checkFavicon(img, domain) {
+    if (img.naturalWidth < 24 || img.naturalHeight < 24) {
+        localStorage.setItem(faviconKey(domain), '0');
+        img.remove();
+    } else {
+        localStorage.setItem(faviconKey(domain), '1');
+    }
+}
+
+async function init() {
+    try {
+        const res = await fetch('quetta-bookmarks.html');
+        const text = await res.text();
+        const doc = new DOMParser().parseFromString(text, 'text/html');
+        const qa = Array.from(doc.querySelectorAll('h3, dt'))
+            .find(el => el.textContent.includes('Quick Access'));
+        bookmarkData = parseDL(qa.closest('dt').querySelector('dl'));
+        renderGrid(bookmarkData);
+    } catch {
+        document.body.innerHTML += '<p style="color:gray">로딩 실패</p>';
+    }
+}
+
+function parseDL(dl) {
+    const data = [];
+    if (!dl) return data;
+
+    dl.querySelectorAll(':scope > dt').forEach(dt => {
+        const h3 = dt.querySelector(':scope > h3');
+        const a = dt.querySelector(':scope > a');
+        if (h3) {
+            data.push({
+                type: 'folder',
+                name: h3.textContent.trim(),
+                children: parseDL(dt.querySelector('dl'))
             });
-            return data;
-        }
-
-        function renderGrid(list) {
-            const grid = document.getElementById('bookmarkGrid');
-            const backBar = document.getElementById('backBar');
-            grid.innerHTML = '';
-            window.scrollTo(0, 0);
-            backBar.style.display = currentFolderStack.length ? 'block' : 'none';
-
-            list.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'item';
-                if (item.type === 'folder') {
-                    div.innerHTML = `<div class="icon-box"><i data-lucide="folder" class="folder-icon"></i></div><span class="label">${item.name}</span>`;
-                    div.onclick = () => { currentFolderStack.push(item); renderGrid(item.children); };
-                } else {
-                    const domain = new URL(item.url).hostname;
-                    const cleanDomain = domain.replace('www.', '');
-                    const char = cleanDomain.charAt(0).toUpperCase();
-                    // 구글 파비콘 API (128px 고해상도) 사용
-                    const iconUrl = item.icon || `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-
-                    div.innerHTML = `
-                        <a href="${item.url}" target="_self" class="item">
-                            <div class="icon-box">
-                                <span class="char-placeholder">${char}</span>
-                                <img class="favicon-img ${domain.includes('github.com') ? 'github-invert' : ''}" 
-                                     src="${iconUrl}" onerror="this.style.display='none'">
-                            </div>
-                            <span class="label">${item.name}</span>
-                        </a>`;
-                }
-                grid.appendChild(div);
+        } else if (a) {
+            data.push({
+                type: 'link',
+                name: a.textContent.trim(),
+                url: a.href
             });
-            lucide.createIcons();
         }
+    });
+    return data;
+}
 
-        function goBack() {
-            currentFolderStack.pop();
-            renderGrid(currentFolderStack.length ? currentFolderStack[currentFolderStack.length-1].children : bookmarkData);
+function renderGrid(list) {
+    const grid = document.getElementById('bookmarkGrid');
+    const backBar = document.getElementById('backBar');
+    grid.innerHTML = '';
+    backBar.style.display = currentFolderStack.length ? 'block' : 'none';
+
+    list.forEach(item => {
+        const wrapper = document.createElement('div');
+
+        if (item.type === 'folder') {
+            wrapper.className = 'item';
+            wrapper.innerHTML = `
+                <div class="icon-box">
+                    <i data-lucide="folder" class="folder-icon"></i>
+                </div>
+                <span class="label">${item.name}</span>`;
+            wrapper.onclick = () => {
+                currentFolderStack.push(item);
+                renderGrid(item.children);
+            };
+        } else {
+            const domain = new URL(item.url).hostname.replace('www.', '');
+            const firstChar = domain[0].toUpperCase();
+            const bg = hashColor(domain);
+
+            const ok = localStorage.getItem(faviconKey(domain));
+            const appleIcon = `https://${domain}/apple-touch-icon.png`;
+            const googleIcon = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+
+            wrapper.innerHTML = `
+            <a href="${item.url}" class="item">
+                <div class="icon-box">
+                    <div class="char-placeholder" style="background:${bg}">
+                        ${firstChar}
+                    </div>
+                    ${ok !== '0' ? `
+                    <img class="favicon-img ${domain.includes('github.com') ? 'github-invert' : ''}"
+                         src="${appleIcon}"
+                         onerror="this.src='${googleIcon}'"
+                         onload="checkFavicon(this, '${domain}')">` : ''}
+                </div>
+                <span class="label">${item.name}</span>
+            </a>`;
         }
+        grid.appendChild(wrapper);
+    });
+    lucide.createIcons();
+}
 
-        window.onload = init;
-    </script>
+function goBack() {
+    currentFolderStack.pop();
+    renderGrid(
+        currentFolderStack.length
+            ? currentFolderStack[currentFolderStack.length - 1].children
+            : bookmarkData
+    );
+}
+
+window.onload = init;
+</script>
 </body>
 </html>
