@@ -100,6 +100,14 @@ h1 {
     position: absolute;
     inset: 0;
     z-index: 2;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+.favicon-img.small-icon {
+    object-fit: contain;
+    padding: 10px;
+    image-rendering: pixelated;
 }
 
 .github-invert {
@@ -126,7 +134,6 @@ h1 {
     margin-top: 6px;
     width: 100%;
     text-align: center;
-
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -158,33 +165,147 @@ h1 {
 let bookmarkData = [];
 let currentFolderStack = [];
 
-/* 🔹 상위 도메인 추출 */
+/* ── 도메인 추출 ── */
 function getRootDomain(hostname) {
     const parts = hostname.replace(/^www\./, '').split('.');
-    return parts.length > 2
-        ? parts.slice(-2).join('.')
-        : parts.join('.');
+    return parts.length > 2 ? parts.slice(-2).join('.') : parts.join('.');
 }
 
-function faviconKey(domain) {
-    return `favicon-ok:${domain}`;
+/* ── 캐시 키 (v3 → 이전 잘못된 캐시 무효화) ── */
+const CACHE_VER = 'v3:';
+function cacheKey(domain) { return `fav:${CACHE_VER}${domain}`; }
+
+/* ══════════════════════════════════════════
+   지구본 지문(fingerprint) — Canvas 픽셀 비교
+   ══════════════════════════════════════════ */
+
+/** 이미지를 16×16 canvas로 그려 dataURL 반환. CORS 차단 시 null. */
+function toDataUrl16(src) {
+    return new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            try {
+                const c = document.createElement('canvas');
+                c.width = c.height = 16;
+                c.getContext('2d').drawImage(img, 0, 0, 16, 16);
+                resolve(c.toDataURL());
+            } catch { resolve(null); }
+        };
+        img.onerror = () => resolve(null);
+        // 캐시 버스팅: 같은 src라도 crossOrigin 재요청
+        img.src = src;
+    });
 }
 
-/* 🔹 파비콘 정상 로드시 알파벳 제거 */
-function checkFavicon(img, domain) {
-    if (img.naturalWidth < 24 || img.naturalHeight < 24) {
-        localStorage.setItem(faviconKey(domain), '0');
-        img.remove();
-    } else {
-        localStorage.setItem(faviconKey(domain), '1');
-        const placeholder = img.previousElementSibling;
-        if (placeholder && placeholder.classList.contains('char-placeholder')) {
-            placeholder.remove();
-        }
+/* 서비스별 "기본 지구본" dataURL (null = 지문 획득 실패 → 검사 생략) */
+const BAD_FP = {};
+
+async function initBadFingerprints() {
+    const FAKE = 'zz-nonexistent-domain-abc99887.example.invalid';
+    const targets = [
+        ['google',  `https://www.google.com/s2/favicons?domain=${FAKE}&sz=128`],
+        ['googleV2',`https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${FAKE}&size=128`],
+        ['ddg',     `https://icons.duckduckgo.com/ip3/${FAKE}.ico`],
+    ];
+    await Promise.all(targets.map(async ([tag, url]) => {
+        BAD_FP[tag] = await toDataUrl16(url);
+    }));
+}
+
+/** dataURL이 알려진 지구본과 일치하면 true */
+function isGlobe(dataUrl) {
+    if (!dataUrl) return false;
+    return Object.values(BAD_FP).some(fp => fp && fp === dataUrl);
+}
+
+/* ══════════════════════════════════════════
+   파비콘 소스 목록
+   ══════════════════════════════════════════ */
+function faviconSources(domain) {
+    return [
+        // ① 사이트 자체 고화질 (지구본 없음)
+        { tag: null,       minSize: 24, url: `https://${domain}/apple-touch-icon.png` },
+        { tag: null,       minSize: 24, url: `https://${domain}/apple-touch-icon-precomposed.png` },
+        // ② Clearbit — 없으면 404 반환, 지구본 없음
+        { tag: null,       minSize: 24, url: `https://logo.clearbit.com/${domain}` },
+        // ③ Google (지구본 감지 필요)
+        { tag: 'google',   minSize: 16, url: `https://www.google.com/s2/favicons?domain=${domain}&sz=128` },
+        // ④ Google FaviconV2 (지구본 감지 필요)
+        { tag: 'googleV2', minSize: 16, url: `https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=128` },
+        // ⑤ DuckDuckGo (지구본 감지 필요)
+        { tag: 'ddg',      minSize: 16, url: `https://icons.duckduckgo.com/ip3/${domain}.ico` },
+        // ⑥ 사이트 자체 favicon (지구본 없음)
+        { tag: null,       minSize: 16, url: `https://${domain}/favicon.png` },
+        { tag: null,       minSize: 16, url: `https://${domain}/favicon.ico` },
+    ];
+}
+
+/* ══════════════════════════════════════════
+   단일 소스 로드 + 유효성 검사
+   ══════════════════════════════════════════ */
+function tryLoad(url, minSize, tag) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = async () => {
+            // 크기 검사
+            if (img.naturalWidth < minSize || img.naturalHeight < minSize) {
+                return reject(new Error('too small'));
+            }
+            // tag 있는 소스(Google, DDG) → 지구본 canvas 비교
+            if (tag && BAD_FP[tag] !== undefined) {
+                // BAD_FP[tag]가 null이면 지문 획득 실패 → 검사 생략(허용)
+                if (BAD_FP[tag] !== null) {
+                    const dataUrl = await toDataUrl16(url);
+                    if (dataUrl && isGlobe(dataUrl)) {
+                        return reject(new Error('globe detected'));
+                    }
+                }
+            }
+            resolve({ src: url, w: img.naturalWidth, h: img.naturalHeight });
+        };
+        img.onerror = () => reject(new Error('error'));
+        img.src = url;
+    });
+}
+
+/* ── Waterfall ── */
+async function resolveFavicon(domain) {
+    const cached = localStorage.getItem(cacheKey(domain));
+    if (cached) {
+        try { return JSON.parse(cached); } catch { /* 손상 캐시 무시 */ }
     }
+
+    for (const { tag, url, minSize } of faviconSources(domain)) {
+        try {
+            const result = await tryLoad(url, minSize, tag);
+            localStorage.setItem(cacheKey(domain), JSON.stringify(result));
+            return result;
+        } catch { /* 다음 소스 */ }
+    }
+
+    localStorage.setItem(cacheKey(domain), JSON.stringify(null));
+    return null;
 }
 
+/* ── 아이콘 박스에 이미지 주입 ── */
+function applyFavicon(iconBox, domain, result) {
+    if (!result) return;
+    const img = document.createElement('img');
+    img.className = 'favicon-img';
+    if (domain.includes('github.com')) img.classList.add('github-invert');
+    if (result.w <= 32 || result.h <= 32) img.classList.add('small-icon');
+    img.src = result.src;
+    const placeholder = iconBox.querySelector('.char-placeholder');
+    if (placeholder) placeholder.remove();
+    iconBox.appendChild(img);
+}
+
+/* ── 초기화 ── */
 async function init() {
+    // 지문 수집과 북마크 파싱을 병렬로 시작
+    const fingerprintReady = initBadFingerprints();
+
     try {
         const res = await fetch('quetta-bookmarks.html');
         const text = await res.text();
@@ -192,6 +313,9 @@ async function init() {
         const qa = Array.from(doc.querySelectorAll('h3, dt'))
             .find(el => el.textContent.includes('Quick Access'));
         bookmarkData = parseDL(qa.closest('dt').querySelector('dl'));
+
+        // 지문 준비 완료 대기 후 렌더 (보통 수백ms)
+        await fingerprintReady;
         renderGrid(bookmarkData);
     } catch {
         document.body.innerHTML += '<p style="color:gray">로딩 실패</p>';
@@ -201,29 +325,20 @@ async function init() {
 function parseDL(dl) {
     const data = [];
     if (!dl) return data;
-
     dl.querySelectorAll(':scope > dt').forEach(dt => {
         const h3 = dt.querySelector(':scope > h3');
-        const a = dt.querySelector(':scope > a');
+        const a  = dt.querySelector(':scope > a');
         if (h3) {
-            data.push({
-                type: 'folder',
-                name: h3.textContent.trim(),
-                children: parseDL(dt.querySelector('dl'))
-            });
+            data.push({ type: 'folder', name: h3.textContent.trim(), children: parseDL(dt.querySelector('dl')) });
         } else if (a) {
-            data.push({
-                type: 'link',
-                name: a.textContent.trim(),
-                url: a.href
-            });
+            data.push({ type: 'link', name: a.textContent.trim(), url: a.href });
         }
     });
     return data;
 }
 
 function renderGrid(list) {
-    const grid = document.getElementById('bookmarkGrid');
+    const grid    = document.getElementById('bookmarkGrid');
     const backBar = document.getElementById('backBar');
     grid.innerHTML = '';
     backBar.style.display = currentFolderStack.length ? 'block' : 'none';
@@ -243,26 +358,33 @@ function renderGrid(list) {
                 renderGrid(item.children);
             };
         } else {
-            const host = new URL(item.url).hostname;
-            const domain = getRootDomain(host);
-            const firstChar = domain[0].toUpperCase();
+            let host, domain;
+            try {
+                host   = new URL(item.url).hostname;
+                domain = getRootDomain(host);
+            } catch { return; }
 
-            const ok = localStorage.getItem(faviconKey(domain));
-            const appleIcon = `https://${domain}/apple-touch-icon.png`;
-            const googleIcon = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+            const firstChar = domain[0].toUpperCase();
 
             wrapper.innerHTML = `
             <a href="${item.url}" class="item">
                 <div class="icon-box">
                     <div class="char-placeholder">${firstChar}</div>
-                    ${ok !== '0' ? `
-                    <img class="favicon-img ${domain.includes('github.com') ? 'github-invert' : ''}"
-                         src="${appleIcon}"
-                         onerror="this.src='${googleIcon}'"
-                         onload="checkFavicon(this, '${domain}')">` : ''}
                 </div>
                 <span class="label">${item.name}</span>
             </a>`;
+
+            const iconBox = wrapper.querySelector('.icon-box');
+
+            const cached = localStorage.getItem(cacheKey(domain));
+            if (cached) {
+                try {
+                    const result = JSON.parse(cached);
+                    if (result) applyFavicon(iconBox, domain, result);
+                } catch { /* 무시 */ }
+            } else {
+                resolveFavicon(domain).then(result => applyFavicon(iconBox, domain, result));
+            }
         }
         grid.appendChild(wrapper);
     });
