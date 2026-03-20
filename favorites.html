@@ -7,12 +7,10 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
-            /* 5. 배경색 변경: 아주 어두운 회색 */
             --bg-color: #121212; 
-            --tile-bg: #1e1e1e; /* 아이콘 박스 배경색 */
+            --tile-bg: #1e1e1e;
             --title-color: #ffffff; 
             --text-dim: #999999;
-            --folder-color: #ffffff;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -46,158 +44,101 @@
         }
 
         .back-btn {
-            background: none;
-            border: none;
-            color: var(--title-color);
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
+            background: none; border: none; color: #fff;
+            font-size: 0.9rem; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; gap: 4px;
         }
 
         #bookmarkGrid {
             display: grid;
             grid-template-columns: repeat(4, 1fr); 
-            gap: 12px 8px; /* 간격 축소 */
+            gap: 12px 8px;
             width: 100%;
-            max-width: 340px; /* 전체 너비 축소 */
-            margin-top: 20px;
+            max-width: 340px;
         }
 
-        h1 + #bookmarkGrid { margin-top: 30px; }
-
         .item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-decoration: none;
-            color: inherit;
-            width: 100%;
-            min-width: 0;
-            cursor: pointer;
+            display: flex; flex-direction: column; align-items: center;
+            text-decoration: none; color: inherit; width: 100%; min-width: 0;
         }
 
         .icon-box {
             width: 100%;
-            /* 1. 아이콘 크기 약 10% 축소: max-width 조정 */
             max-width: 58px; 
             aspect-ratio: 1 / 1;
             background-color: var(--tile-bg);
-            border-radius: 16px; /* 둥글기 살짝 조정 */
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            border-radius: 16px;
+            display: flex; justify-content: center; align-items: center;
             overflow: hidden;
             border: 1px solid #2a2a2a;
-            transition: transform 0.1s;
         }
 
-        .item:active .icon-box { transform: scale(0.92); }
-
+        /* 아이콘 선명도 강제 향상 */
         .favicon-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            image-rendering: -webkit-optimize-contrast; /* 2. 선명도 향상 CSS */
+            width: 100%; height: 100%; object-fit: cover;
+            image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
         }
         
-        /* Github 등 검은색 아이콘 반전 (4번 해결) */
-        .invert-icon {
-            filter: invert(1) brightness(2); /* 흰색으로 반전 후 밝기 조정 */
+        /* GitHub 전용 반전 필터 */
+        .invert-white {
+            filter: invert(1) brightness(2);
         }
 
-        /* 3. 알파벳 대체 아이콘 스타일 */
+        /* 알파벳 대체 아이콘 */
         .char-icon {
-            font-size: 24px;
-            font-weight: 700;
-            color: rgba(255,255,255,0.8);
-            text-transform: uppercase;
+            font-size: 24px; font-weight: 800;
+            color: #ffffff; text-transform: uppercase;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
-        .folder-icon { color: var(--folder-color); width: 26px; height: 26px; }
+        .folder-icon { color: #fff; width: 26px; height: 26px; }
 
         .label {
-            font-size: 10px;
-            color: var(--text-dim);
-            text-align: center;
-            width: 100%;
-            margin-top: 7px;
-            display: block;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-size: 10px; color: var(--text-dim); text-align: center;
+            width: 100%; margin-top: 7px; display: block;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
             padding: 0 3px;
         }
-
-        .loading-status { color: #555; margin-top: 50px; font-size: 12px; }
     </style>
 </head>
 <body>
 
     <h1>CH Favorites</h1>
-    
-    <div class="back-bar" id="backBar">
-        <button class="back-btn" id="backBtn">
-            <i data-lucide="chevron-left" size="18"></i> 뒤로
-        </button>
-    </div>
-
+    <div class="back-bar" id="backBar"><button class="back-btn" id="backBtn"><i data-lucide="chevron-left"></i> 뒤로</button></div>
     <div id="bookmarkGrid"></div>
-    <div id="status" class="loading-status"></div>
 
     <script>
-        let bookmarkData = []; // 최상위 데이터
-        let currentFolderStack = []; // 뒤로 가기 추적용 스택
+        let bookmarkData = [];
+        let currentFolderStack = [];
 
         async function init() {
-            const status = document.getElementById('status');
             try {
-                status.textContent = "데이터 불러오는 중...";
                 const response = await fetch('quetta-bookmarks.html');
-                if (!response.ok) throw new Error();
                 const text = await response.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(text, 'text/html');
-
-                const qaHeader = Array.from(doc.querySelectorAll('h3, h2, h1, dt')).find(el => el.textContent.includes('Quick Access'));
-                if (!qaHeader) { status.textContent = "Quick Access 폴더 없음"; return; }
-
-                const parentDT = qaHeader.closest('dt');
-                const mainDL = parentDT.querySelector('dl');
-
+                const qaHeader = Array.from(doc.querySelectorAll('h3, dt')).find(el => el.textContent.includes('Quick Access'));
+                const mainDL = qaHeader.closest('dt').querySelector('dl');
                 bookmarkData = parseDL(mainDL);
-                renderGrid(bookmarkData); // 최상위 목록 그리기
-                status.style.display = 'none';
-            } catch (err) {
-                status.textContent = "파일을 찾을 수 없습니다.";
-            }
+                renderGrid(bookmarkData);
+            } catch (err) { console.error("Load Error"); }
 
-            // 뒤로 가기 버튼 이벤트 등록
-            document.getElementById('backBtn').onclick = function() {
-                if (currentFolderStack.length > 0) {
-                    currentFolderStack.pop(); // 현재 폴더를 스택에서 제거
-                    const prevData = currentFolderStack.length > 0 ? currentFolderStack[currentFolderStack.length - 1].children : bookmarkData;
-                    renderGrid(prevData); 
-                }
+            document.getElementById('backBtn').onclick = () => {
+                currentFolderStack.pop();
+                renderGrid(currentFolderStack.length > 0 ? currentFolderStack[currentFolderStack.length-1].children : bookmarkData);
             };
         }
 
         function parseDL(dl) {
             let data = [];
             if (!dl) return data;
-            const dts = dl.querySelectorAll(':scope > dt');
-            dts.forEach(dt => {
+            dl.querySelectorAll(':scope > dt').forEach(dt => {
                 const h3 = dt.querySelector(':scope > h3');
                 const a = dt.querySelector(':scope > a');
-                const nextDL = dt.querySelector(':scope > dl');
-
-                if (h3 && nextDL) {
-                    data.push({ type: 'folder', name: h3.textContent.trim(), children: parseDL(nextDL) });
+                if (h3) {
+                    data.push({ type: 'folder', name: h3.textContent.trim(), children: parseDL(dt.querySelector('dl')) });
                 } else if (a) {
-                    // [2. 선명도 향상] 북마크 파일 내부의 ICON 속성(고해상도 데이터 URL) 우선 추출
                     data.push({ type: 'link', name: a.textContent.trim(), url: a.href, icon: a.getAttribute('ICON') });
                 }
             });
@@ -207,79 +148,52 @@
         function renderGrid(dataList) {
             const grid = document.getElementById('bookmarkGrid');
             const backBar = document.getElementById('backBar');
-            grid.innerHTML = ''; // 기존 목록 초기화
-
-            // 폴더 전환 시 화면 맨 위로 스크롤
-            window.scrollTo({ top: 0, behavior: 'instant' }); 
-
-            // 뒤로 가기 바 표시 여부 결정
-            if (currentFolderStack.length > 0) {
-                backBar.style.display = 'block';
-                grid.style.marginTop = '0';
-            } else {
-                backBar.style.display = 'none';
-                grid.style.marginTop = '20px';
-            }
+            grid.innerHTML = '';
+            window.scrollTo(0, 0);
+            backBar.style.display = currentFolderStack.length > 0 ? 'block' : 'none';
 
             dataList.forEach(item => {
                 const el = document.createElement('div');
                 el.className = 'item';
                 
                 if (item.type === 'folder') {
-                    // 폴더 아이콘 스타일 수정: 흰색 실루엣 느낌
-                    el.innerHTML = `
-                        <div class="icon-box"><i data-lucide="folder" class="folder-icon"></i></div>
-                        <span class="label">${item.name}</span>
-                    `;
-                    el.onclick = () => {
-                        currentFolderStack.push(item); // 현재 폴더를 스택에 추가
-                        renderGrid(item.children); // 자식 목록 그리기
-                    };
+                    el.innerHTML = `<div class="icon-box"><i data-lucide="folder" class="folder-icon"></i></div><span class="label">${item.name}</span>`;
+                    el.onclick = () => { currentFolderStack.push(item); renderGrid(item.children); };
                 } else {
                     const domain = new URL(item.url).hostname;
-                    // [2 & 3. 선명도 & 대체] 3중 안전장치 파비콘 로직
-                    // 1순위: 북마크 파일 내부 ICON 데이터 (고해상도)
-                    // 2순위: DuckDuckGo 고해상도 API
-                    // 3순위: 알파벳 대체 아이콘
-                    let faviconUrl = item.icon || `https://icons.duckduckgo.com/ip3/${domain}.ico`;
-                    
-                    // [4. Github 검은색 아이콘 해결] 특정 도메인 아이콘 반전 처리
-                    let imgClass = "favicon-img";
-                    if (domain.includes('github.com')) imgClass += " invert-icon";
+                    // Google의 새로운 고화질 파비콘 서비스 주소로 변경
+                    const highResFavicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=256`;
+                    const isGithub = domain.includes('github.com');
 
                     el.innerHTML = `
-                        <a href="${item.url}" target="_self" class="item" style="margin-bottom:0">
+                        <a href="${item.url}" target="_self" class="item">
                             <div class="icon-box">
-                                <img class="${imgClass}" src="${faviconUrl}" onerror="handleFaviconError(this, '${domain}')">
+                                <img class="favicon-img ${isGithub ? 'invert-white' : ''}" 
+                                     src="${item.icon || highResFavicon}" 
+                                     onload="this.style.opacity=1"
+                                     onerror="handleIconError(this, '${domain}')">
                             </div>
                             <span class="label">${item.name}</span>
-                        </a>
-                    `;
+                        </a>`;
                 }
                 grid.appendChild(el);
             });
             lucide.createIcons();
         }
 
-        // Favicon 로드 실패 시 대체 로직 (최종 안전장치)
-        function handleFaviconError(img, domain) {
-            if (img.src.includes('quetta-bookmarks.html') || img.complete) return; // 이미 ICON 데이터로 로드된 경우 패스
+        function handleIconError(img, domain) {
+            // 이미 알파벳으로 변환된 경우 중복 실행 방지
+            if (img.dataset.failed) return;
+            img.dataset.failed = "true";
 
-            if (img.src.includes('duckduckgo')) {
-                // DuckDuckGo 실패 시 구글 고해상도 API로 2차 시도
-                img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-            } else if (img.src.includes('sz=128')) {
-                // 구글 고해상도 실패 시 구글 일반 API로 3차 시도
-                img.src = `https://www.google.com/s2/favicons?domain=${domain}`;
-            } else {
-                // [3. 알파벳 대체 아이콘] 모든 이미지 로드 실패 시 도메인의 첫 글자 표시
-                img.style.display = 'none';
-                const char = domain.charAt(0).toUpperCase();
-                const charDiv = document.createElement('div');
-                charDiv.className = 'char-icon';
-                charDiv.textContent = char;
-                img.parentElement.appendChild(charDiv);
-            }
+            const parent = img.parentElement;
+            img.style.display = 'none';
+            
+            const firstChar = domain.replace('www.', '').charAt(0).toUpperCase();
+            const charDiv = document.createElement('div');
+            charDiv.className = 'char-icon';
+            charDiv.textContent = firstChar;
+            parent.appendChild(charDiv);
         }
 
         window.onload = init;
