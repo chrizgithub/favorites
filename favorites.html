@@ -186,7 +186,7 @@ function checkFavicon(img, domain) {
 
 async function init() {
     try {
-        const res = await fetch('quetta-bookmarks.html');
+        const res = await fetch('1.html');
         const text = await res.text();
         const doc = new DOMParser().parseFromString(text, 'text/html');
         const qa = Array.from(doc.querySelectorAll('h3, dt'))
